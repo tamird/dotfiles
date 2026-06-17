@@ -141,11 +141,15 @@
 
 # Working method
 
-- For substantive or design-sensitive changes, follow this loop: understand the
-  existing ownership boundary and invariants; design the change; review the
-  design; implement it; review the implementation for correctness and design
-  drift; review whether the review feedback itself preserves the intended
-  design before making follow-up changes.
+- For substantive or design-sensitive changes, first study the existing
+  ownership and invariants, then design the change. You own the goal, context,
+  invariants, task breakdown, integration, and final result. Have `high` agents
+  review the design. Delegate implementation, canonical regeneration, and
+  focused validation to `medium` agents with bounded scopes. Use disjoint
+  scopes when work can proceed in parallel. Have `high` agents other than the
+  implementers when practical review the result for correctness and design
+  drift. Check the findings against the intended design and delegate valid
+  corrections. Repeat until the reviews are clean.
 - Do not apply review feedback mechanically when it introduces special cases,
   compatibility layers, or additional concepts. Identify the systemic problem
   behind the finding and prefer the change that reduces the overall conceptual
@@ -167,9 +171,6 @@
   objective, invariants, branch and PR relationships, current blockers, and
   next sequence. Update it after major state changes so context compaction does
   not change the plan.
-- Keep ownership of the overall goal in the primary thread. Give subagents
-  bounded questions or disjoint implementation scopes, then review their work
-  against the primary design before integrating it.
 - When CI or review is still running, distinguish relevant signal from the
   aggregate tail. Collect enough failures to identify a pattern before editing,
   and do not change product code merely to make a slow check disappear.
