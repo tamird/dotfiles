@@ -103,6 +103,10 @@
   work. Do not stage edits merely to resolve conflicts or tidy the index unless
   I ask you to. Staging is fine when I have asked you to commit, publish, or
   otherwise prepare the change for delivery.
+- `PUSHPATROL_BYPASS=1` is permitted when pushing to a public repository that
+  already contains at least one public commit authored by the user. Before
+  bypassing PushPatrol, verify that the pushed changes contain no
+  OpenAI-specific code or prose.
 - Do not use a repository-wide worktree or index rewrite such as
   `git restore --staged --worktree -- .` merely to discard a known patch.
   Derive the affected paths and restore them in one batched invocation.
