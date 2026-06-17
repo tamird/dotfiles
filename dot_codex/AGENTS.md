@@ -20,6 +20,16 @@
 - Do not use Markdown headings in pull request descriptions.
 - Do not mention validation in pull request descriptions when it is already
   covered by normal CI.
+- Write pull request titles and descriptions in plain English for a reader who
+  understands the repository but has not followed the implementation work.
+- Treat pull request description text as scarce. Use it to explain the delta
+  from the merge base, the important invariants the change establishes, the
+  reasons for non-obvious choices, and caveats that affect reviewers or
+  maintainers. Remove baseline truths, implementation trivia, progress notes,
+  and claims that do not help the reader understand the change.
+- Name concrete files, data, and behavior instead of relying on vague terms or
+  unexplained project-specific shorthand. A sentence should make clear what
+  changed and why the reader needs to know it.
 - Never reference GitHub pull requests; use commit links instead.
 - For a precursor PR extracted from another PR, make its first top-level
   comment `Extracted from #<parent PR number>.` This tracking comment is the

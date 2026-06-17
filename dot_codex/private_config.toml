@@ -290,6 +290,9 @@ trust_level = "trusted"
 [projects."/Users/tamird/code/opentelemetry-python-contrib"]
 trust_level = "trusted"
 
+[projects."/Users/tamird/code/goid"]
+trust_level = "trusted"
+
 [marketplaces.openai-primary-runtime]
 last_updated = "2026-06-02T00:18:14Z"
 source_type = "local"
