@@ -1,4 +1,4 @@
-model = "koffing-updated"
+model = "gpt-5.6"
 personality = "pragmatic"
 commit_attribution = ""
 service_tier = "fast"
