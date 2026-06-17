@@ -1,0 +1,5 @@
+theme = Pro
+font-family = Monaco
+font-size = 10
+background-opacity = 0.9
+desktop-notifications = true

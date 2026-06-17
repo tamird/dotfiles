@@ -1,0 +1,23 @@
+IMAPAccount gmail
+Host imap.gmail.com
+User tamird@gmail.com
+PassCmd "op read op://Private/hve5tovo4lwn4yaltc2e2llgmy/password"
+AuthMechs LOGIN
+TLSType IMAPS
+
+IMAPStore gmail-remote
+Account gmail
+
+MaildirStore rust-for-linux-local
+Inbox ~/Mail/rust-for-linux
+
+Channel rust-for-linux
+Far :gmail-remote:"rust for linux"
+Near :rust-for-linux-local:
+MaxMessages 1000
+ExpireUnread yes
+Create Near
+Sync Pull
+Expunge None
+CopyArrivalDate yes
+SyncState *

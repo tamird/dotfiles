@@ -1,0 +1,26 @@
+alias gap='git add --patch'
+alias gb='git branch --verbose'
+alias gca='gcv --amend'
+alias gco='git checkout'
+alias gcp='git checkout --patch'
+alias gcv='git commit --verbose'
+alias gd='git diff'
+alias gfo='git fetch --all --prune --tags'
+alias gpu='git push -u tamird'
+alias grc='git rebase --continue'
+alias gs='git status'
+
+alias ls='ls --color=auto -lah'
+
+alias codex='\
+BUILDKITE_API_TOKEN=$(op read op://Private/fyyg7wesemhezilz264aljzbfy/credential) \
+codex'
+
+alias skoobe-work='maui skoobe -n metaguest -k effici3ncy --account-type facebook --email $(op read op://Private/facebook/email) --password $(op read op://Private/facebook/password) --two-fac-code $(op item get --otp facebook)'
+alias skoobe-home='maui skoobe -n Verizon_6NN4GC -k fuse4-crest-lad --account-type facebook --email $(op read op://Private/facebook/email) --password $(op read op://Private/facebook/password) --two-fac-code $(op item get --otp facebook)'
+
+alias wifi-work='maui wifi-connect -n metaguest -k effici3ncy'
+alias wifi-home='maui wifi-connect -n Verizon_6NN4GC -k fuse4-crest-lad'
+
+# This is way too fucking slow.
+# eval "$(z profile)"

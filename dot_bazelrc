@@ -1,0 +1,6 @@
+build --profile=/tmp/profile.json --starlark_cpu_profile=/tmp/profile.pb.gz
+
+# Keep shared local Bazel caches bounded by age across workspaces.
+common:mac_laptop --experimental_disk_cache_gc_max_size=0
+common:mac_laptop --experimental_disk_cache_gc_max_age=7d
+common:mac_laptop --repo_contents_cache_gc_max_age=7d

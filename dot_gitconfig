@@ -1,0 +1,92 @@
+[advice]
+	mergeConflict = false
+	skippedCherryPicks = false
+[am]
+	threeWay = true
+[color]
+	ui = auto
+[commit]
+	gpgSign = true
+[commitGraph]
+	changedPaths = true
+	changedPathsVersion = 2
+[core]
+	autocrlf = input
+	excludesfile = ~/.gitignore_global
+	commentchar = ";"
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[fetch]
+	parallel = 0
+[gpg "ssh"]
+	allowedSignersFile = ~/.ssh/allowed_signers
+[gpg]
+	format = ssh
+[http]
+	cookiefile = ~/.gitcookies
+[hub]
+	protocol = ssh
+[init]
+	defaultBranch = main
+[log]
+	follow = true
+	mailmap = true
+[maintenance]
+	repo = ~/code/openai/openai
+[merge]
+	conflictstyle = diff3
+	renamelimit = 15000
+[pull]
+	rebase = true
+[patatt]
+	signingkey = openssh:~/.ssh/patatt.pub
+[push]
+	autoSetupRemote = true
+	default = simple
+[rebase]
+	autoSquash = true
+	autoStash = true
+	rebaseMerges = true
+	updateRefs = true
+[repo]
+	superprojectChoice = true
+	superprojectChoiceExpire = 1635800846
+[rerere]
+	autoupdate = true
+	enabled = true
+[sendemail]
+	smtpEncryption = tls
+	smtpServer     = smtp.gmail.com
+	smtpServerPort = 587
+	smtpUser       = tamird@gmail.com
+[credential "smtp://smtp.gmail.com:587"]
+	helper = "op 'op://Private/hve5tovo4lwn4yaltc2e2llgmy/password'"
+[tag]
+	gpgSign = true
+[user]
+	email = tamird@gmail.com
+	name = Tamir Duberstein
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWM9+oO4gzEpGOSuwG+dZLBl+4SYLDEbfl1WU6yMzFS
+
+[includeIf "gitdir:/home/codespace/"]
+	path = ~/.gitconfig-codespaces
+[includeIf "gitdir:/workspaces/"]
+	path = ~/.gitconfig-codespaces
+[includeIf "gitdir:~/code/b4/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:~/code/ktest/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:~/code/lkp-tests/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:~/code/review-prompts/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:~/code/linux/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:/Volumes/Linux/"]
+	path = ~/.gitconfig-kernel
+[includeIf "gitdir:~/code/openai/"]
+	path = ~/code/openai/.gitconfig

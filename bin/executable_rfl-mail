@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import subprocess
+from pathlib import Path
+from typing import Literal, TypedDict, cast
+
+
+Mode = Literal["inbox", "series", "sync"]
+
+
+class Arguments(argparse.Namespace):
+    mode: Mode = "inbox"
+
+
+class Message(TypedDict, total=False):
+    f: list[tuple[str | None, str]]
+    kw: list[str]
+    m: str
+
+
+parser = argparse.ArgumentParser()
+_ = parser.add_argument(
+    "mode", nargs="?", choices=("inbox", "series", "sync"), default="inbox"
+)
+args = parser.parse_args(namespace=Arguments())
+
+_ = subprocess.check_call(["mbsync", "-q", "rust-for-linux"])
+_ = subprocess.check_call(
+    ["lei", "index", "-r", str(Path.home() / "Mail/rust-for-linux")]
+)
+
+match args.mode:
+    case "inbox":
+        output = subprocess.check_output(
+            [
+                "lei",
+                "q",
+                "--no-remote",
+                "--no-external",
+                "-f",
+                "jsonl",
+                "-s",
+                "received",
+                "-r",
+                "t:tamird@kernel.org",
+            ],
+            text=True,
+        )
+        for line in output.splitlines():
+            message = cast(Message, json.loads(line))
+            senders = {address.casefold() for _, address in message.get("f", [])}
+            keywords = set(message.get("kw", []))
+            if (
+                message.get("m")
+                and "tamird@kernel.org" not in senders
+                and "answered" not in keywords
+            ):
+                print(json.dumps(message, ensure_ascii=False, separators=(",", ":")))
+
+    case "series":
+        revision = int(
+            subprocess.check_output(
+                ["b4", "prep", "--show-info", "revision"], text=True
+            )
+        )
+        if revision <= 1:
+            raise SystemExit("rfl-mail: current series has not been sent")
+        series = subprocess.check_output(
+            ["b4", "prep", "--show-info", f"series-v{revision - 1}"], text=True
+        )
+        message_id = series.rsplit(maxsplit=1)[-1]
+        _ = subprocess.check_call(
+            [
+                "lei",
+                "q",
+                "--no-remote",
+                "--no-external",
+                "-t",
+                "-f",
+                "jsonl",
+                "-s",
+                "received",
+                "-r",
+                f"thread:{message_id}",
+            ]
+        )
+
+    case "sync":
+        pass

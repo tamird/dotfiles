@@ -1,0 +1,17 @@
+[b4]
+	keyringsrc = ~/code/pgpkeys/.keyring
+	review-tui-disable-mouse = yes
+[gpg]
+	format = openpgp
+[patatt]
+	signingkey = openpgp:5A6714204D41EC844C50273C19D6FF6092365380
+[sendemail]
+	smtpencryption = ssl
+	smtpserver     = mail.kernel.org
+	smtpserverport = 465
+	smtpuser       = tamird
+[credential "smtp://mail.kernel.org:465"]
+	helper = "op 'op://Private/2mcnvh5nafv5io6juht3ixmap4/password'"
+[user]
+	email = tamird@kernel.org
+	signingkey = 5A6714204D41EC844C50273C19D6FF6092365380

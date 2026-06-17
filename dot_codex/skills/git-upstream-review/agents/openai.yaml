@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Upstream Review"
+  short_description: "Audit Git patches against maintainer expectations"
+  default_prompt: "Use $git-upstream-review to audit this Git patch and prepare it for submission."

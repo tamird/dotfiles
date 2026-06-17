@@ -1,0 +1,13 @@
+defaults
+auth on
+tls on
+tls_starttls on
+
+account gmail
+host smtp.gmail.com
+port 587
+user tamird@gmail.com
+from %F
+passwordeval "op read op://Private/hve5tovo4lwn4yaltc2e2llgmy/password"
+
+account default : gmail

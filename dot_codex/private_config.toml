@@ -1,0 +1,336 @@
+model = "koffing-updated"
+personality = "pragmatic"
+commit_attribution = ""
+service_tier = "fast"
+model_reasoning_effort = "xhigh"
+
+notify = ["/Users/tamird/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
+
+[sandbox_workspace_write]
+network_access = true
+
+[features]
+apps = true
+hooks = true
+multi_agent = true
+rmcp_client = true
+memories = true
+js_repl = false
+
+[plugins."linear@openai-curated"]
+enabled = true
+
+[plugins."google-calendar@openai-curated"]
+enabled = true
+
+[plugins."gmail@openai-curated"]
+enabled = true
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."notion@openai-curated"]
+enabled = true
+
+[plugins."slack-legacy@openai-curated"]
+enabled = true
+
+[plugins."site-creator@openai-bundled-alpha"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[plugins."google-drive@openai-curated"]
+enabled = true
+
+[plugins."browser@openai-bundled-alpha"]
+enabled = true
+
+[plugins."sites@openai-bundled"]
+enabled = true
+
+[plugins."slack@openai-curated"]
+enabled = true
+
+[plugins."engineering-acceleration@openai-monorepo"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[projects."/Users/tamird/code/openai/mia"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/lordoftherings"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/openai"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/aya"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/aya-template"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/infra"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/terraform-provider-azurerm"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/bpf-linker"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/.local/share/chezmoi"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/codex"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/clap"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/rust"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/fleet-infra"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/common-infra"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/free-disk-space"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Downloads/logs"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/rules_rust"]
+trust_level = "trusted"
+
+[projects."/Volumes/Linux/linux"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/llvm-project"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/network-types"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/safe"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/b4"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/cargo-smart-release"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/go-partition"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/book"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/getrandom"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/node-clangd"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/wodifunc"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/fastapi"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/rust-cache"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/gvisor"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/ztunnel"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/syn"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/lkp-tests"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/ktest"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/rust-spiffe"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/shinomug"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/brix"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/grpc"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/py-spiffe"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/pyjwt"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/infrasec-oncall-2025-02-10"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/codex-brix-oidc-spike-archive"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/superassistant"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/1brc"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/rust-bindgen"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/interview-questions"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/dbx_build_tools"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/vscode-clangd"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/instructor"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/ty/ruff"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/lancedb"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/liblore"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/typeshed"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/robotstxt"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/line-of-sight"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/mesh-api"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/python-slack-sdk"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/b4/patatt"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/b4/ezgb"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/kubernetes"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Downloads"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/git"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/dependency-cooldowns"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai/IT"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/openai"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Documents/Codex/2026-05-16/please-collect-evidence-for-why-codex"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Documents/Codex/2026-05-16-is-this-thing-on"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Documents/Codex/2026-05-17-look-through-slack-for-information-about"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/bb-storage"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/Documents/Codex/2026-05-27/slack-plugin-slack-openai-curated-check"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/uv"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/bazel"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/opentelemetry-python-contrib"]
+trust_level = "trusted"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-06-02T00:18:14Z"
+source_type = "local"
+source = "/Users/tamird/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[marketplaces.openai-bundled]
+last_updated = "2026-06-07T11:47:44Z"
+source_type = "local"
+source = "/Users/tamird/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[memories]
+generate_memories = true
+use_memories = true
+
+[desktop]
+ambient-suggestions-enabled = true
+conversationDetailMode = "STEPS_COMMANDS"
+git-branch-prefix = "tamird/codex/"
+appearanceTheme = "dark"
+
+[tui.model_availability_nux]
+"gpt-5.5" = 1
+
+[apps.asdk_app_69a1d78e929881919bba0dbda1f6436d]
+enabled = true
+
+[mcp_servers.node_repl]
+args = []
+command = "/Applications/Codex.app/Contents/Resources/node_repl"
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = ""
+NODE_REPL_NODE_PATH = "/Applications/Codex.app/Contents/Resources/node"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/tamird/.codex"
+CODEX_HOME = "/Users/tamird/.codex"
+NODE_REPL_TRACE_META = "1"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "74fa0eada32e9969c5c5778113bd7e9ec850590aea1c3d77efbbbe09bd9d2dcc"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "internal-alpha"
+CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"

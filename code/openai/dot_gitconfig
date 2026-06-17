@@ -1,0 +1,7 @@
+[core]
+	hooksPath = /Library/Application Support/OpenAI/Tools/PushPatrol/git-hooks
+[lfs]
+	hooksPath = /Library/Application Support/OpenAI/Tools/PushPatrol/git-hooks/lfs
+[user]
+	email = tamird@openai.com
+	signingkey = key::ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNhOkY+HSdLwBM+1jP34JJ/IR900SZ9DCFgrM3eYVW57Fv1TVt8zzlM4nhHdL/+c041r/rRI5/AMHsyGKTw5M4Y= tamird@openai.com

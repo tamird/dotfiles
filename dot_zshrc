@@ -1,0 +1,60 @@
+#!/usr/bin/env zsh
+
+source "$HOME/.shellrc"
+
+HISTSIZE=1000000000
+SAVEHIST=$HISTSIZE
+
+# https://github.com/ohmyzsh/ohmyzsh/blob/master/lib/history.zsh
+
+setopt append_history         # keep history file growing instead of overwriting it
+setopt hist_save_by_copy      # avoid history loss when multiple shells exit together
+setopt extended_history       # record timestamp of command in HISTFILE
+setopt hist_expire_dups_first # delete duplicates first when HISTFILE size exceeds HISTSIZE
+setopt hist_ignore_dups       # ignore duplicated commands history list
+setopt hist_ignore_space      # ignore commands that start with space
+setopt hist_verify            # show command with history expansion to user before running it
+setopt share_history          # share command history data
+
+if [ -d "$HOME/.zsh.d" ]; then
+  FPATH=$HOME/.zsh.d:$FPATH
+fi
+
+autoload -Uz compinit && compinit
+
+if type brew &>/dev/null; then
+  FPATH=$(brew --prefix)/share/zsh/site-functions:$FPATH
+
+  compdef _git gap='git-add'
+  compdef _git gb='git-branch'
+  compdef _git gca='git-commit'
+  compdef _git gco='git-checkout'
+  compdef _git gcp='git-checkout'
+  compdef _git gcv='git-commit'
+  compdef _git gd='git-diff'
+  compdef _git gfo='git-fetch'
+  compdef _git gpu='git-push'
+  compdef _git grc='git-rebase'
+  compdef _git gs='git-status'
+fi
+
+if command -v b4 > /dev/null 2>&1; then
+  eval "$(b4 --print-completion zsh)"
+fi
+
+bindkey -e
+
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook zsh)"
+fi
+
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi
+
+# OpenAI shrc (if customising, comment out to prevent it getting readded)
+# for file in "/Users/tamird/.openai/shrc"/*; do
+#     source "$file"
+# done
+
+# eval "$(z profile)"

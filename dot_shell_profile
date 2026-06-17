@@ -1,0 +1,42 @@
+export EDITOR=vim
+export GOTRACEBACK=all
+
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+PATH="$HOME"/.local/bin:"$HOME"/bin:$PATH:"$HOME"/go/bin
+
+if [ -f "$HOME"/.cargo/env ]; then
+  source "$HOME"/.cargo/env
+else
+  PATH=$PATH:"$HOME"/.cargo/bin
+fi
+
+if [ -d "$HOME"/.bun ]; then
+  BUN_INSTALL="$HOME"/.bun
+  PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+[ -f "$HOME"/.config/op/plugins.sh ] && source "$HOME"/.config/op/plugins.sh
+
+export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
+podman_init() {
+    DOCKER_HOST=unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')
+    export DOCKER_HOST
+}
+
+export MISE_GO_SET_GOBIN=false
+
+export TF_CLI_ARGS_apply="-parallelism=256"
+export TF_CLI_ARGS_plan="-parallelism=256"
+
+export KUBECONFIG=~/.kube/config:~/.kube/api_config:~/.kube/fleet_config
+
+export GAZELLE_PRECOMMIT_ENABLED=1
+
+# OpenAI shprofile. Needed for codex.
+for file in "/Users/tamird/.openai/shprofile"/*; do
+    source "$file"
+done

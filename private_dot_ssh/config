@@ -1,0 +1,9 @@
+Include applied-devbox.d/*.conf # Must be ABOVE any Host directives
+
+Host gitolite.kernel.org
+  User git
+  ClearAllForwardings yes
+  ControlMaster auto
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlPersist 1H
+  ServerAliveInterval 60

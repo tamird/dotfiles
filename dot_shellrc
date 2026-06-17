@@ -1,0 +1,36 @@
+if command -v goenv &>/dev/null; then
+  eval "$(goenv init - --no-rehash)"
+fi
+
+if command -v brew &>/dev/null; then
+  if [ -d "$(brew --prefix rustup)/bin" ]; then
+    PATH="$(brew --prefix rustup)/bin:$PATH"
+  fi
+
+  if [ -d "$(brew --prefix ccache)/libexec" ]; then
+    PATH="$(brew --prefix ccache)/libexec:$PATH"
+  fi
+
+  if [ -d "$(brew --prefix llvm)/bin" ]; then
+    PATH="$(brew --prefix llvm)/bin:$PATH"
+  fi
+
+  if [ -d "$(brew --prefix uutils-coreutils)/libexec/uubin" ]; then
+    PATH="$(brew --prefix uutils-coreutils)/libexec/uubin:$PATH"
+  fi
+fi
+
+source "$HOME"/.shell_aliases
+
+# --- GPG / pinentry / tmux integration ---
+#
+# tmux creates non-login interactive shells with a different TTY per pane.
+# gpg-agent caches the TTY it first sees; without updating it, pinentry may
+# fail with "Inappropriate ioctl for device" when signing.
+export GPG_TTY=$(tty)
+gpg-connect-agent updatestartuptty /bye >/dev/null
+
+# OpenAI shrc. Needed for codex.
+for file in "/Users/tamird/.openai/shrc"/*; do
+    source "$file"
+done

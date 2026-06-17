@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mailing List Review"
+  short_description: "Review and reroll mailing-list patch series"
+  default_prompt: "Use $mailing-list-review to review and prepare this mailing-list patch series."

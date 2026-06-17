@@ -1,0 +1,159 @@
+prefix_rule(pattern=["uvx", "tox"], decision="allow")
+prefix_rule(
+    pattern=["bazel"],
+    decision="allow",
+    justification="Bazel needs host access for repository downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["project/dotslash-gen/bin/bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["./project/dotslash-gen/bin/bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["applied", "bazel"],
+    decision="allow",
+    justification="The Applied Bazel wrapper needs host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["nice", "-n", "20", "bazel"],
+    decision="allow",
+    justification="Bazel needs host access for repository downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["nice", "-n", "20", "bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["nice", "-n", "20", "project/dotslash-gen/bin/bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["nice", "-n", "20", "./project/dotslash-gen/bin/bazelisk"],
+    decision="allow",
+    justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(
+    pattern=["nice", "-n", "20", "applied", "bazel"],
+    decision="allow",
+    justification="The Applied Bazel wrapper needs host access for downloads, remote execution, and remote caches.",
+)
+prefix_rule(pattern=["/bin/zsh", "-lc", "bazel test --macos_sdk_version=$(xcrun --show-sdk-version) -- //tools/nogo/... //tools/check{aligned,const,escape,linkname,locks,unsafe}/..."], decision="allow")
+prefix_rule(pattern=["cargo", "fetch", "-p", "k8s-csi"], decision="allow")
+prefix_rule(pattern=["cargo", "+nightly", "clippy", "--all-targets", "--target", "aarch64-unknown-linux-musl", "--", "--deny", "warnings"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "DOCKER_BUILDKIT=1 make test"], decision="allow")
+prefix_rule(pattern=["kubectl", "get"], decision="allow")
+prefix_rule(pattern=["kubectl", "describe"], decision="allow")
+prefix_rule(pattern=["rm", "-f", ".coverage*"], decision="allow")
+prefix_rule(pattern=["find", ".", "-maxdepth", "1", "-name", ".coverage*", "-type", "f", "-delete"], decision="allow")
+prefix_rule(pattern=["git", "reset", "--hard", "ac96a3ecbe7c677074ec5ab6dc155594fc9aa56f"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-endpoint", "list"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-endpoint", "show"], decision="allow")
+prefix_rule(pattern=["az", "network", "nic", "show"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-dns", "record-set", "a", "show"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-dns", "zone", "list"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-dns", "record-set", "cname", "show"], decision="allow")
+prefix_rule(pattern=["rm", "-rf", "/tmp/ci-good", "/tmp/ci-bad"], decision="allow")
+prefix_rule(pattern=["cargo", "+stable", "test", "test_strip_generics", "--lib"], decision="allow")
+prefix_rule(pattern=["az", "aks", "nodepool", "operation", "--help"], decision="allow")
+prefix_rule(pattern=["az", "aks", "nodepool", "show", "-g", "lab-32", "--cluster-name", "lab-32", "-n", "ds364001", "-o", "json"], decision="allow")
+prefix_rule(pattern=["az", "aks", "nodepool", "show", "--subscription", "a7619616-9d31-44c2-8229-458fdfcc62b6", "-g", "lab-32", "--cluster-name", "lab-32", "-n", "ds364001", "-o", "json"], decision="allow")
+prefix_rule(pattern=["az", "aks", "operation", "--help"], decision="allow")
+prefix_rule(pattern=["az", "aks", "nodepool", "operation-abort", "--help"], decision="allow")
+prefix_rule(pattern=["az", "aks", "operation", "show", "--help"], decision="allow")
+prefix_rule(pattern=["az", "aks", "operation", "show-latest", "--help"], decision="allow")
+prefix_rule(pattern=["az", "aks", "operation", "show", "--subscription", "a7619616-9d31-44c2-8229-458fdfcc62b6", "-g", "lab-32", "-n", "lab-32", "--nodepool-name", "ds364001", "--operation-id", "dac26681-5f82-4fdf-b15e-1f920bce4f1c", "-o", "json"], decision="allow")
+prefix_rule(pattern=["az", "aks", "operation", "show-latest", "--subscription", "a7619616-9d31-44c2-8229-458fdfcc62b6", "-g", "lab-32", "-n", "lab-32", "--nodepool-name", "ds364001", "-o", "json"], decision="allow")
+prefix_rule(pattern=["swift", "build"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build"], decision="allow")
+prefix_rule(pattern=["kubectl", "get", "pod"], decision="allow")
+prefix_rule(pattern=["az", "network", "private-dns", "link", "vnet", "list"], decision="allow")
+prefix_rule(pattern=["cargo", "xtask", "integration-test", "vm"], decision="allow")
+prefix_rule(pattern=["cargo", "xtask", "integration-test", "--bench", "vm"], decision="allow")
+prefix_rule(pattern=["brix", "ssh"], decision="allow")
+prefix_rule(pattern=["api/applied-specs/scripts/check_applied_specs.py", "test_namespace_allow_list_entries_not_redundant_with_search_cluster_carveout"], decision="allow")
+prefix_rule(pattern=["api/applied-specs/scripts/check_applied_specs.py", "test_unused_namespace_allow_list_items"], decision="allow")
+prefix_rule(pattern=["api/applied-specs/scripts/check_applied_specs.py", "test_namespace_allow_list_exact_entries_not_covered_by_prefixes"], decision="allow")
+prefix_rule(pattern=["api/applied-specs/scripts/check_applied_specs.py", "test_namespace_allow_list_entries_not_redundant_with_single_tenant_cluster_carveout"], decision="allow")
+prefix_rule(pattern=["go", "tool", "ginkgo"], decision="allow")
+prefix_rule(pattern=["make", "k3d-brix"], decision="allow")
+prefix_rule(pattern=["make", "-C", "brix", "k3d-brix"], decision="allow")
+prefix_rule(pattern=["./fleet-infra", "codegen"], decision="allow")
+prefix_rule(pattern=["oaipkg", "pipeline"], decision="allow")
+prefix_rule(pattern=["oaipkg", "lock_all"], decision="allow")
+prefix_rule(pattern=["oaipkg", "build_wheel"], decision="allow")
+prefix_rule(pattern=["ps", "-p", "20008", "-o", "pid=,ppid=,etime=,state=,command="], decision="allow")
+prefix_rule(pattern=["make", "-s", "-C", "project/bazel/vendor_imports/python/pypi", "gen"], decision="allow")
+prefix_rule(pattern=["oaipkg", "lock_single"], decision="allow")
+prefix_rule(pattern=["./project/forge/manage/ci_mypy.sh"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "cd project/horse/horse_dashboard && pyright --pythonpath \"$(which python)\" --verbose horse_dashboard/backend/api_service.py"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "cd project/horse/horse_dashboard && pyright --pythonpath \"$(which python)\""], decision="allow")
+prefix_rule(pattern=["./project/forge/manage/ci_pytest.sh"], decision="allow")
+prefix_rule(pattern=["pytest"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "find ~/.cache/uv -type f 2>/dev/null | sed -n '1,5p'"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "find ~/.cache/uv -type f \\( -name 'grpcio*' -o -name '*grpcio*' \\) 2>/dev/null | sed -n '1,200p'"], decision="allow")
+prefix_rule(pattern=["python", "project/crow_docker/build_image.py"], decision="allow")
+prefix_rule(pattern=["brix", "proxy"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "-n", "brix-bastion", "get", "svc", "brix-bastion-infra", "-o", "yaml"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "-n", "brix-bastion", "get", "endpointslices.discovery.k8s.io", "-o", "yaml"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "-n", "brix-bastion", "get", "httproute", "brix-bastion-infra", "-o", "yaml"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "get", "svc", "-A", "-o", "wide"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "-n", "gateway", "get", "pod", "-o", "wide"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context=minke", "-n", "brix-bastion", "get", "pod", "-o", "wide"], decision="allow")
+prefix_rule(pattern=["az", "network", "lb", "show"], decision="allow")
+prefix_rule(pattern=["az", "network", "lb", "list"], decision="allow")
+prefix_rule(pattern=["az", "vmss", "list"], decision="allow")
+prefix_rule(pattern=["az", "vmss", "list-instances"], decision="allow")
+prefix_rule(pattern=["applied", "pkg", "venv"], decision="allow")
+prefix_rule(pattern=["applied", "config", "build", "--name"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "for name in checkout-pricing-config chronon-configs command-center-configs completionsapi-configs deltaline-configs file-lifecycle-queue-configs file-service-configs ignis-scheduler-configs policy-service-prod-configs sa-server-configs sheeporal-cron-configs tensorapi-configs tic-configs tproxy-brte-failure-configs tproxy-configs tproxy-rate-limit-configs vm-configs; do applied config build --name \"$name\" || exit 1; done"], decision="allow")
+prefix_rule(pattern=["oaipkg", "check_dependencies"], decision="allow")
+prefix_rule(pattern=["rm", "-rf", "/tmp/buildkite-logs-3161212"], decision="allow")
+prefix_rule(pattern=["make", "-C", "project/bazel/vendor_imports/python/pypi", "gen"], decision="allow")
+prefix_rule(pattern=["git", "reset", "HEAD", "--"], decision="allow")
+prefix_rule(pattern=["git", "restore"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "OAIPKG_MONOREPO=/Users/tamird/src/openai/openai applied test"], decision="allow")
+prefix_rule(pattern=["bash", "api/authapi/authapi-login-provider/authapi_login_provider/storage/generate_from_proto.sh"], decision="allow")
+prefix_rule(pattern=["bash", "lib/rbac_service/rbac_service/scripts/turtle/generate_from_proto.sh"], decision="allow")
+prefix_rule(pattern=["bash", "lib/applied/integrity/oai-integrity-proto/oai_integrity_proto/generate_protos.sh"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "APP=$(oaipkg app billing-manager); \"$APP/bin/python\" -m openapi_spec_codegen.compare_openapi_schema billing_manager.asgi:application api/billing-manager/generated_openapi_spec billing-manager"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "APP=$(oaipkg app tailor); \"$APP/bin/python\" -m openapi_spec_codegen.compare_openapi_schema tailor.asgi:application api/tailor/openapi/internal tailor-api"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "ALL_PROXY= HTTPS_PROXY= HTTP_PROXY= NO_PROXY= APP=$(oaipkg app billing-manager); ALL_PROXY= HTTPS_PROXY= HTTP_PROXY= NO_PROXY= \"$APP/bin/python\" -m openapi_spec_codegen.compare_openapi_schema billing_manager.asgi:application api/billing-manager/generated_openapi_spec billing-manager"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "ALL_PROXY= HTTPS_PROXY= HTTP_PROXY= NO_PROXY= APP=$(oaipkg app tailor); ALL_PROXY= HTTPS_PROXY= HTTP_PROXY= NO_PROXY= \"$APP/bin/python\" -m openapi_spec_codegen.compare_openapi_schema tailor.asgi:application api/tailor/openapi/internal tailor-api"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "RUSTC_BOOTSTRAP=1 cargo +beta hack test --feature-powerset --exclude-features llvm-link-static,no-llvm-linking,default,llvm-20,llvm-22,rust-llvm-20,rust-llvm-22 --features llvm-21"], decision="allow")
+prefix_rule(pattern=["git", "add"], decision="allow")
+prefix_rule(pattern=["oaipkg", "installoai"], decision="allow")
+prefix_rule(pattern=["oaipkg", "installext"], decision="allow")
+prefix_rule(pattern=["bash", "oaiproto/regenerate.sh"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "applied pkg venv responsesapi -- pytest api/responsesapi/responsesapi/tests/methods/responses/part_3/test_create_response_method_async.py -k background_false -q --timeout=20 > /tmp/responsesapi_background_false_timeout20.log 2>&1"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "openssl s_client -connect v12.thepinkpig.org:50051 -servername v12.thepinkpig.org -showcerts </dev/null"], decision="allow")
+prefix_rule(pattern=["rm", "-rf", "/tmp/protoc_gen_mypy_upstream"], decision="allow")
+prefix_rule(pattern=["uv", "run"], decision="allow")
+prefix_rule(pattern=["xargs", "-0", "protoc", "-I", "/Users/tamird/src/mypy-protobuf/proto", "--plugin=protoc-gen-mypy=/Users/tamird/src/mypy-protobuf/protoc-gen-mypy-go", "--mypy_out=/Users/tamird/src/mypy-protobuf/test/generated_codex"], decision="allow")
+prefix_rule(pattern=["xargs", "-0", "/Users/tamird/src/mypy-protobuf/protoc_32.1/protoc_install/bin/protoc", "--proto_path=/Users/tamird/src/mypy-protobuf/proto", "--proto_path=/Users/tamird/src/mypy-protobuf/protoc_32.1/protoc_install/include", "--experimental_allow_proto3_optional", "--plugin=protoc-gen-mypy=/Users/tamird/src/mypy-protobuf/protoc-gen-mypy-go", "--python_out=/Users/tamird/src/mypy-protobuf/test/generated_codex", "--mypy_out=/Users/tamird/src/mypy-protobuf/test/generated_codex"], decision="allow")
+prefix_rule(pattern=["oaipkg", "app"], decision="allow")
+prefix_rule(pattern=["uv", "tool"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "OAIPKG_MONOREPO=$PWD bazel build //api/inference-lb:inference_lb_bin //api/inference-lb-proxy:inference_lb_proxy_bin"], decision="allow")
+prefix_rule(pattern=["applied", "test"], decision="allow")
+prefix_rule(pattern=["otool", "-L"], decision="allow")
+prefix_rule(pattern=["nm", "-gU", "bazel-bin/project/enginev3/oai_opentelemetry_cpp/oai_opentelemetry_cpp_ext.so"], decision="allow")
+prefix_rule(pattern=["nm", "-gU", "bazel-bin/api/inference-lb-proxy/inference_lb_proxy_ext.so"], decision="allow")
+prefix_rule(pattern=["nm", "-gU", "bazel-bin/lib/oai_grpc_cpp/oai_grpc_cpp_ext.so"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "env RUNFILES_MANIFEST_FILE=$PWD/bazel-bin/api/inference-lb-proxy/pytest.runfiles_manifest TEST_TMPDIR=/tmp/codex-ilb bazel-bin/api/inference-lb-proxy/pytest -k test_mock_world"], decision="allow")
+prefix_rule(pattern=["lldb", "--batch"], decision="allow")
+prefix_rule(pattern=["lib/applied/turtle_emulator/scripts/generate_grpc_client.sh"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context", "argon", "get"], decision="allow")
+prefix_rule(pattern=["kubectl", "--context", "argon", "-n", "otunnel", "get"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "OUTPUT_BASE=$(bazel info output_base) && find \"$OUTPUT_BASE/external\" -path '*rules_rust*' -name 'rust_binary.bzl' -o -path '*rules_rust*' -name 'defs.bzl' | head -n 20"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "OUTPUT_BASE=$(bazel info output_base) && find \"$OUTPUT_BASE\" -name 'rust_binary.bzl' 2>/dev/null | head -n 20"], decision="allow")

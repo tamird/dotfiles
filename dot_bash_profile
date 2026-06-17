@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+source "$HOME"/.shell_profile
+
+# OpenAI shprofile (if customising, comment out to prevent it getting readded)
+# for file in "/Users/tamird/.openai/shprofile"/*; do
+#     source "$file"
+# done

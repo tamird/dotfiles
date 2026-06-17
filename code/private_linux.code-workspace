@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "/Volumes/Linux/linux",
+		}
+	],
+	"settings": {
+		"editor.tabSize": 8,
+		"vim.textwidth": 80,
+		"rust-analyzer.linkedProjects": [
+			"${workspaceFolder}/.kunit/rust-project.json",
+		],
+	},
+}
