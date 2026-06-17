@@ -126,9 +126,10 @@
   sandbox by requesting escalated execution. Bazel requires host access for
   repository downloads, remote execution, and remote caches. Keep Bazel's own
   action sandbox enabled.
-- Run compilation and build commands at the maximum positive nice value
-  supported by the host (`nice -n 20` on macOS) so background builds yield CPU
-  to interactive work.
+- Run compute-heavy compilation and build commands on the local machine at the
+  maximum positive nice value supported by the host (`nice -n 20` on macOS) so
+  background builds yield CPU to interactive work. Do not add niceness to CI
+  configuration or lightweight compilation.
 - Use subagents whenever they would materially improve parallelism, turnaround
   time, or result quality. Do not avoid them to save tokens. Delegation is
   explicitly permitted unless otherwise stated.
