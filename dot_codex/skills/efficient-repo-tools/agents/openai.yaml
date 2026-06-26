@@ -1,0 +1,4 @@
+interface:
+  display_name: "Efficient Repo Tools"
+  short_description: "Efficient Git and repository traversal"
+  default_prompt: "Use $efficient-repo-tools to inspect this repository without redundant scans."

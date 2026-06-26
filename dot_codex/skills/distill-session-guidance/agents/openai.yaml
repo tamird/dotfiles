@@ -1,0 +1,7 @@
+interface:
+  display_name: "Distill Session Guidance"
+  short_description: "Turn session lessons into durable guidance"
+  default_prompt: "Use $distill-session-guidance to review this session and improve durable guidance."
+
+policy:
+  allow_implicit_invocation: false

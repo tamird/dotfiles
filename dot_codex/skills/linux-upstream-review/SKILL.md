@@ -1,13 +1,13 @@
 ---
 name: linux-upstream-review
-description: Prepare, review, reroll, and reply to Linux kernel mailing-list patch series. Use in Linux kernel trees for subsystem history and lore archaeology, b4-managed series, MAINTAINERS-based recipients, kernel commit-message and DCO review, checkpatch, selftests/KUnit/build validation, and maintainer-persona review. Load mailing-list-review first for the shared lore and series workflow.
+description: Prepare, review, reroll, and reply to Linux kernel mailing-list patch series. Use in Linux kernel trees for subsystem history and lore archaeology, b4-managed series, MAINTAINERS-based recipients, kernel commit-message and DCO review, checkpatch, selftests/KUnit/build validation, and evidence-backed maintainer review.
 ---
 
 # Linux Upstream Review
 
-Read `../mailing-list-review/SKILL.md` completely and apply it as the base
-workflow. This skill contains only Linux-kernel additions. Also follow the
-checkout's `AGENTS.md` and subsystem documentation.
+Apply `$mailing-list-review` as the base workflow. This skill contains only
+Linux-kernel additions. Also follow the checkout's `AGENTS.md` and subsystem
+documentation.
 
 ## Establish kernel context
 
@@ -68,12 +68,12 @@ When old compilers or architectures matter, reproduce with the canonical
 toolchain path and record the exact evidence. Do not replace requested native
 builds with unrelated Docker experiments.
 
-## Review like the subsystem
+## Add kernel review lenses
 
-Use `MAINTAINERS`, accepted commits, and lore to seed independent reviewer
-passes with the actual subsystem's concerns. Include maintainers and reviewers
-from varied affiliations; do not exclude or privilege one employer except when
-the task supplies a reason.
+Use `MAINTAINERS`, accepted commits, and lore to extend `$maintainer-review`
+with the actual subsystem's concerns. Include evidence from maintainers and
+reviewers across relevant ownership paths and affiliations; do not exclude or
+privilege one employer without a task-specific reason.
 
 Add concurrency, memory ordering, API/ABI, architecture, and toolchain personas
 when the patch touches those areas.

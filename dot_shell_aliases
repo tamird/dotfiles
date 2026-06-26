@@ -15,6 +15,9 @@ alias ls='ls --color=auto -lah'
 alias codex='\
 BUILDKITE_API_TOKEN=$(op read op://Private/fyyg7wesemhezilz264aljzbfy/credential) \
 codex'
+alias frodex='\
+BUILDKITE_API_TOKEN=$(op read op://Private/fyyg7wesemhezilz264aljzbfy/credential) \
+frodex'
 
 alias skoobe-work='maui skoobe -n metaguest -k effici3ncy --account-type facebook --email $(op read op://Private/facebook/email) --password $(op read op://Private/facebook/password) --two-fac-code $(op item get --otp facebook)'
 alias skoobe-home='maui skoobe -n Verizon_6NN4GC -k fuse4-crest-lad --account-type facebook --email $(op read op://Private/facebook/email) --password $(op read op://Private/facebook/password) --two-fac-code $(op item get --otp facebook)'

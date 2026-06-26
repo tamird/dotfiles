@@ -1,12 +1,12 @@
 ---
 name: git-upstream-review
-description: Prepare, reroll, review, and reply to patches for the Git project mailing list. Use for git.git changes, Git commit-message review, t/ and t/perf validation, performance-patch evidence, maintainer-feedback disposition, and Git-specific revision threading. Load mailing-list-review first for the shared lore and series workflow.
+description: Prepare, reroll, review, and reply to patches for the Git project mailing list. Use for git.git changes, Git commit-message review, t/ and t/perf validation, performance-patch evidence, maintainer-feedback disposition, and Git-specific revision threading.
 ---
 
 # Git Upstream Review
 
-Read `../mailing-list-review/SKILL.md` completely and apply it as the base
-workflow. This skill contains only Git-project additions.
+Apply `$mailing-list-review` as the base workflow. This skill contains only
+Git-project additions.
 
 ## Required context
 

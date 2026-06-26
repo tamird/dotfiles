@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change Record Writing"
+  short_description: "Write reviewable commits and pull requests"
+  default_prompt: "Use $change-record-writing to write this commit or pull request record."

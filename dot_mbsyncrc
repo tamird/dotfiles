@@ -21,3 +21,17 @@ Sync Pull
 Expunge None
 CopyArrivalDate yes
 SyncState *
+
+MaildirStore bpf-local
+Inbox ~/Mail/bpf
+
+Channel bpf
+Far :gmail-remote:bpf
+Near :bpf-local:
+MaxMessages 1000
+ExpireUnread yes
+Create Near
+Sync Pull
+Expunge None
+CopyArrivalDate yes
+SyncState *

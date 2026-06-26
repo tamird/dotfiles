@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audience-Aware Writing"
+  short_description: "Write from the reader’s actual context"
+  default_prompt: "Use $audience-aware-writing to revise this draft for the reader’s actual context and decision."

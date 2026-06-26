@@ -1,22 +1,26 @@
 ---
 name: mailing-list-review
-description: Prepare, review, reroll, and respond to email-based patch series using public-inbox archives such as lore. Use for projects that develop through mailing lists when Codex must reconstruct prior revisions and replies, review code and commit messages, maintain a feedback ledger, prepare a new revision, or inspect rendered mail. Apply a project-specific skill in addition when one exists.
+description: Prepare, review, reroll, and respond to email-based patch series using public-inbox archives such as lore. Use when reconstructing prior revisions and replies, reviewing code and permanent prose, maintaining feedback dispositions, preparing a reroll, or inspecting rendered mail. Use a project-specific upstream-review skill instead when one exists; those skills apply this shared base.
 ---
 
 # Mailing List Review
 
-Own the change rather than polishing the latest diff in isolation. Reconstruct
-the discussion, understand the invariant, and make the permanent history stand
-alone.
+Apply `$maintainer-review`, which also supplies the writing and history bases.
+This skill adds the mailing-list record, feedback, reroll, and delivery
+workflow.
+
+Own the complete series rather than polishing the latest diff in isolation.
+Reconstruct the discussion, understand the invariant, and make the permanent
+history stand alone.
 
 ## Gather the record
 
-Before editing, collect:
+Collect:
 
-- the exact base, current commits, diff, and cover letter;
-- every submitted revision and all replies, including replies to replies;
+- the exact base, complete series, diff, and cover letter;
+- every submitted revision and all replies, including nested replies;
 - the target branch and overlapping topics;
-- comparable commits and current project submission guidance.
+- comparable accepted commits and current submission guidance.
 
 Use `scripts/fetch_lore_threads.py` through the local liblore environment:
 
@@ -29,9 +33,10 @@ uv run --project ~/code/b4/liblore \
 ```
 
 Select the narrowest public-inbox endpoint that contains the thread. Do not
-rely on a web UI, remembered discussion, or a revision changelog.
+substitute a web UI, remembered discussion, or a revision changelog for the
+complete record.
 
-## Keep a review ledger
+## Track feedback
 
 Record each substantive comment as:
 
@@ -43,77 +48,55 @@ Use one disposition:
 
 - `address`: change code, tests, prose, or mail metadata;
 - `reject`: explain why the suggestion is incorrect or worse;
-- `defer`: establish that it is independent and that this series does not
-  depend on it;
-- `question`: answer or investigate before deciding.
+- `defer`: show that it is independent and this series does not depend on it;
+- `question`: investigate or answer before deciding.
 
-Never silently omit feedback. Review whether the proposed disposition itself
-preserves the intended design.
-
-## Build project reviewer personas
-
-Before delegating review, reconstruct how the project actually reviews
-patches. Search accepted and rejected mailing-list threads, prioritizing the
-same files, subsystem, protocol, and patch shape. Identify two to four active
-maintainers or reviewers and record the messages or accepted commits that
-support each persona's review tendencies.
-
-Seed reviewer agents with those evidence-backed project personas, not generic
-maintainer stereotypes. Give each agent the whole series, including the cover
-letter and commit messages, and a distinct review axis reflected in that
-person's actual feedback. Require concrete findings with file or mail evidence
-and an explicit statement of full-series coverage. If no project-specific
-skill exists, this archaeology is still required; use the narrowest relevant
-public-inbox archive and local history.
-
-## Understand and design
-
-Trace the concrete ownership boundary and call path first:
-
-1. State the old behavior and user-visible failure.
-2. Identify the exact mechanism causing it.
-3. Recover intent from history and discussion.
-4. List public, dormant, error, and alternate-backend paths.
-5. State the invariant the new code must preserve.
-
-Prefer one coherent mechanism over wrappers, special cases, or compatibility
-layers. Split independent correctness fixes, prerequisites, and policy changes
-when each is independently reviewable. Do not apply feedback mechanically when
-it increases the conceptual count.
+Never silently omit feedback. Review each disposition against the intended
+design rather than applying the comment mechanically.
 
 ## Build the series
 
+- Trace the concrete behavior and ownership boundary before editing.
+- Prefer one coherent mechanism over wrappers, special cases, or compatibility
+  layers.
+- Split independent correctness fixes, prerequisites, and policy changes when
+  each is independently useful and reviewable.
 - Make every commit build and test independently.
-- Put behavioral coverage with the behavior it protects.
-- Keep correctness tests separate from performance measurements.
-- Test the regression and meaningful negative or error paths; avoid
-  tautological tests.
-- Run narrow validation first, then broaden it according to the change's risk.
-- Run the project's formatter and patch checks against every commit, not only
-  the final tree.
+- Put behavioral coverage with the behavior it protects. Keep correctness tests
+  separate from performance measurements.
+- Test the regression and meaningful negative paths; avoid tautological tests.
+- Run narrow validation first, then broaden it according to risk.
+- Run project format and patch checks against every commit, not only the final
+  tree.
 - Compare parent and patched trees with identical setup for performance work.
-- Account for likely counterexamples, not only the motivating case.
 
-Write commit messages as short causal narratives: old behavior, mechanism,
-new behavior, and the preserved invariant. Keep revision language in the cover
-letter, not permanent history. Use only project-recognized trailers and never
-claim review or testing credit that was not offered.
+Write commit messages as short causal narratives: old behavior, mechanism, new
+behavior, and preserved invariant. Keep revision history in the cover letter.
+Use only project-recognized trailers and never claim review or testing credit
+that was not offered.
 
 ## Prepare mail
 
-- Follow the target project's revision-threading convention; do not assume all
-  projects want every revision in one thread.
-- Determine recipients from project tools, ownership files, relevant history,
-  and prior reviewers.
+- Follow the target project's revision-threading convention.
+- Determine recipients from project tools, ownership, affected-path history,
+  prior participants, and substantive reviewers.
 - Compare revisions with a range-diff and account for every change.
-- Render the exact outgoing mail and inspect subjects, recipients, threading,
+- Render and inspect the exact outgoing mail: subjects, recipients, threading,
   MIME, cover letter, commit bodies, diffstat, and base.
-- Reply inline with enough quoted context to identify the issue.
+- Route mail through an SMTP account for the sender's domain. Keep the envelope
+  sender and DKIM identity aligned with the visible `From` address.
+- Unless `From` is an `@gmail.com` address, reflect an envelope-only copy to
+  the parsed `From` address so the sender's mailbox retains the message. Do
+  not add a visible `Bcc` header.
+- Build replies by trimming the original message in place. Keep each response
+  directly below the quote it addresses and retain enough surrounding context
+  for other readers.
+- Mark omitted spans between nonadjacent excerpts using the project's
+  convention. Use `[...]` for Linux-style mail.
 
 ## Final review
 
-Perform independent passes for correctness, design simplicity, tests and
-performance, public API or compatibility concerns, permanent prose, and mail
-metadata. Use the evidence-backed project personas built above. After fixes,
-repeat the affected passes. Report any validation or review disposition that
-remains unresolved.
+Apply the evidence-backed maintainer lens to the complete series, cover letter,
+commit messages, tests, and rendered mail. Add project-specific correctness,
+API, compatibility, performance, and metadata passes as needed. After fixes,
+repeat only affected passes and report any unresolved disposition or validation.

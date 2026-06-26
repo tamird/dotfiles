@@ -100,7 +100,7 @@ alternate link modes, documentation, and coverage of the new build path.
 Review paired fields, inherited defaults, comparison with the existing
 path, recursion, and shared mutable traversal state.
 
-## Assemble a committee for libbpf and bpftool host-tool work
+## Cover libbpf and bpftool host-tool concerns
 
 At minimum, cover these independent lenses:
 

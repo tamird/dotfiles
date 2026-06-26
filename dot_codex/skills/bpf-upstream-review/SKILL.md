@@ -1,12 +1,13 @@
 ---
 name: bpf-upstream-review
-description: Prepare, review, reroll, and respond to Linux BPF subsystem patch series covering kernel BPF, libbpf, bpftool, BTF, generated skeletons, and BPF selftests. Use in Linux kernel trees when work targets bpf or bpf-next and needs BPF-specific lore archaeology, API and ABI review, evidence-backed maintainer review lenses, per-commit validation, or b4 mail preparation. Load mailing-list-review and linux-upstream-review first.
+description: Prepare, review, reroll, and respond to Linux BPF subsystem patch series covering kernel BPF, libbpf, bpftool, BTF, generated skeletons, and BPF selftests. Use in Linux kernel trees when work targets bpf or bpf-next and needs BPF-specific lore archaeology, API and ABI review, evidence-backed maintainer review lenses, per-commit validation, or b4 mail preparation.
 ---
 
 # BPF Upstream Review
 
-Apply `mailing-list-review` and `linux-upstream-review` first. This skill
-adds BPF-specific design, reviewer, build, and submission constraints.
+Apply `$linux-upstream-review` first. It already applies the mailing-list and
+maintainer-review bases. This skill adds only BPF-specific design, reviewer,
+build, and submission constraints.
 
 ## Establish the boundary
 
@@ -24,7 +25,11 @@ adds BPF-specific design, reviewer, build, and submission constraints.
    Account for public APIs, ELF and BTF conventions, generated formats,
    and light skeletons as compatibility commitments.
 
-## Construct the review committee
+For BPF mail on this machine, run `mbsync -q bpf`, then index `~/Mail/bpf`
+with `lei index -r`. The Gmail label and isync channel are both named `bpf`;
+do not route them through `rfl-mail`.
+
+## Select BPF review lenses
 
 Read [reviewer-committee.md](references/reviewer-committee.md) when
 selecting reviewers or performing maintainer-style review passes.
@@ -32,7 +37,7 @@ selecting reviewers or performing maintainer-style review passes.
 - Derive formal recipients from current `MAINTAINERS`,
   `scripts/get_maintainer.pl`, affected-path history, and prior thread
   participants.
-- Keep the internal review committee distinct from the recipient list.
+- Keep the review-lens set distinct from the recipient list.
   A useful design lens does not automatically justify a Cc.
 - Refresh representative lore threads for the affected subsystem. Use
   the reference as a seed, not as permanent evidence of current ownership
@@ -44,10 +49,10 @@ selecting reviewers or performing maintainer-style review passes.
   affiliations. Add adjacent-domain reviewers only when their expertise
   bears on the design.
 
-## Perform independent review passes
+## Add BPF review lenses
 
-Review the whole series, including cover letter and every commit, through
-these passes:
+Review the whole series, including the cover letter and every commit, through
+these BPF-specific lenses:
 
 1. **Boundary and need**: Is the user-visible problem demonstrated? Does
    the change live in the correct layer? Is an existing mechanism being

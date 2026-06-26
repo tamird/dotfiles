@@ -293,6 +293,12 @@ trust_level = "trusted"
 [projects."/Users/tamird/code/goid"]
 trust_level = "trusted"
 
+[projects."/Users/tamird/code/rego-cpp"]
+trust_level = "trusted"
+
+[projects."/Users/tamird/code/kubernetes-python"]
+trust_level = "trusted"
+
 [marketplaces.openai-primary-runtime]
 last_updated = "2026-06-02T00:18:14Z"
 source_type = "local"
@@ -312,6 +318,12 @@ ambient-suggestions-enabled = true
 conversationDetailMode = "STEPS_COMMANDS"
 git-branch-prefix = "tamird/codex/"
 appearanceTheme = "dark"
+
+[tui]
+terminal_title = ["activity", "current-dir", "run-state", "thread-title", "git-branch", "context-used"]
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "context-used", "thread-title", "run-state"]
+status_line_use_colors = true
+session_picker_view = "dense"
 
 [tui.model_availability_nux]
 "gpt-5.5" = 1

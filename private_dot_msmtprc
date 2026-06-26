@@ -10,4 +10,12 @@ user tamird@gmail.com
 from %F
 passwordeval "op read op://Private/hve5tovo4lwn4yaltc2e2llgmy/password"
 
+account kernel
+host mail.kernel.org
+port 465
+user tamird
+from %F
+tls_starttls off
+passwordeval "op read op://Private/2mcnvh5nafv5io6juht3ixmap4/password"
+
 account default : gmail
