@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+printf "use repo tools you silly clanker. if you really need rg it is in /opt/homebrew/bin/rg but you probably don't!\n"
+exit 1

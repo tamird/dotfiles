@@ -42,6 +42,11 @@ Then inspect correctness, repository-wide cost, performance evidence, tests,
 generated artifacts, comments, documentation, and review prose. Look for
 special cases or compatibility layers that indicate a design problem.
 
+For refactors and migrations, inspect the cumulative merge-base diffstat with
+generated files separated out. A mostly additive replacement is a design smell:
+identify which old machinery, consumers, or policies remain, and require a
+clear reason for every path that survives beside the new foundation.
+
 Do not apply a historical preference mechanically. Reconcile each finding with
 the intended invariants and current constraints, then prefer the correction
 that simplifies the overall model.

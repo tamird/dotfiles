@@ -9,6 +9,7 @@
 
 - When I name a checkout, branch, pull request, thread, file, or command, start
   with that exact target. If I correct the target, re-anchor before continuing.
+- Local skills override bundled or plugin skills when they conflict.
 - For substantive or design-sensitive changes, first trace the current data
   flow, ownership boundary, and invariants. Use nearby code and relevant path
   history to establish local conventions and maintainer expectations, then
@@ -22,10 +23,17 @@
   wrong; revisit it instead of carrying complexity forward. In review, ask what
   the change makes obsolete and remove it. Prefer a smaller system that meets
   the actual need, even when that means deliberately doing less.
+- Treat the cumulative merge-base delta as the unit of work on an in-flight
+  branch. Do not let earlier branch commits or the current unstaged patch become
+  accidental design constraints; when the design is wrong, redesign against the
+  merge base and delete superseded paths.
 - You own the goal, context, invariants, task breakdown, integration, and final
   result. Organize substantive work into coherent workstreams and keep a small,
   stable set of agents attached so they accumulate the design, code, and review
   history. Parallelize only genuinely independent work.
+- When delegating edits, name the exact checkout, branch, and owned paths. A
+  forked agent shares context, not necessarily an isolated filesystem; do not
+  let agents accidentally edit the same worktree or overlap write scopes.
 - Keep the main thread focused on the goal, invariants, decisions, integration,
   and final evidence. Ask agents for compact conclusions and relevant artifacts,
   not raw exploration logs.
@@ -63,6 +71,11 @@
   objective, invariants, branch and PR relationships, current blockers, and
   next sequence. Update it after major state changes so context compaction does
   not change the plan.
+- When a migration has many independent PRs and review latency is the long pole,
+  publish each scoped change after canonical regeneration and the cheapest
+  meaningful local check, then use CI for broad validation while the next work
+  proceeds. Do not serialize the whole pipeline behind repeated broad local
+  builds unless the user asks for that confidence.
 - When CI or review is still running, distinguish relevant signal from the
   aggregate tail. Collect enough failures to identify a pattern before editing,
   and do not change product code merely to make a slow check disappear.
@@ -96,6 +109,10 @@
   validate that flow manually and record the evidence instead.
 - Do not introduce optional parameters unless there is a clear use case for
   omitting the argument.
+- Prefer closed types for closed domains: `Literal`, enums, and discriminated
+  unions over loose strings plus downstream validation. Use exhaustive `match`
+  arms and `assert_never` for impossible variants; avoid `Any` and `cast` when
+  they only weaken information the caller already has.
 - When editing command invocations, use long options and `--` separators where
   the command supports them.
 - Use assertions for internal invariants, not recoverable input validation.
@@ -110,6 +127,11 @@
   GitHub merge action, unless I explicitly ask you to merge that pull request.
   Preparing, monitoring, or making a pull request merge-ready is not permission
   to merge it.
+- Default extracted precursor pull requests to `master` so independent review
+  and merge can happen in parallel. Stack only when a change semantically
+  requires an unmerged base or I explicitly ask; keep target branches and
+  auto-merge state explicit so a bookkeeping retarget cannot merge the wrong
+  change.
 
 # Tool use
 
@@ -128,10 +150,17 @@
   Derive the affected paths and restore them in one batched invocation.
   Repository-wide rewrites scale with every tracked path and can invalidate
   fsmonitor for other Git commands.
+- Do not start `git status`, `git grep`, or other whole-worktree scans while a
+  worktree is being created or populated by `checkout` or `reset`. Wait for
+  that write to finish; otherwise the scan races a cold index and can repeat a
+  full-tree walk.
 - Do not circumvent git fsmonitor. Circumventing it only makes disk I/O slower
   for all processes.
 - Do not repeatedly rebase just to follow a fast-moving branch. Rebase when it
   is needed for integration, conflict resolution, or an explicit request.
+- Do not run checkout or worktree setup scripts as a reflex. Diagnose the
+  concrete checkout, virtualenv, or hook mismatch first; use setup only when it
+  is the canonical fix for that diagnosed mismatch.
 - Never create or switch to temporary caches, temporary directories, shadow
   workspaces, or other non-canonical storage to work around access
   restrictions, contention, dirty state, or tool behavior. Use the repo's

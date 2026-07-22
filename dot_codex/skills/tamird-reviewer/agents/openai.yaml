@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamird Reviewer"
+  short_description: "Review code with Tamir standards"
+  default_prompt: "Apply $tamird-reviewer to review this cumulative change and report actionable findings."

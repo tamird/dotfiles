@@ -5,6 +5,11 @@ if [ -x /opt/homebrew/bin/brew ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
+# OpenAI shprofile. Needed for codex.
+for file in "/Users/tamird/.openai/shprofile"/*; do
+    source "$file"
+done
+
 PATH="$HOME"/.local/bin:"$HOME"/bin:$PATH:"$HOME"/go/bin
 
 if [ -f "$HOME"/.cargo/env ]; then
@@ -35,8 +40,3 @@ export TF_CLI_ARGS_plan="-parallelism=256"
 export KUBECONFIG=~/.kube/config:~/.kube/api_config:~/.kube/fleet_config
 
 export GAZELLE_PRECOMMIT_ENABLED=1
-
-# OpenAI shprofile. Needed for codex.
-for file in "/Users/tamird/.openai/shprofile"/*; do
-    source "$file"
-done

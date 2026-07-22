@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+printf "use repo tools you silly clanker. if you really need rg it is in /usr/bin/find but you probably don't!\n"
+exit 1
