@@ -12,6 +12,11 @@ for concrete historical examples and the falsification standard behind these
 lenses. Derive expectations from evidence; do not imitate tone or invent
 preferences.
 
+Continuously learn from Tamir's genuinely human-authored substantive reviews.
+Distinguish those reviews from signed tamirdex comments and delegated reviews;
+the assistant's own past findings are not independent evidence of Tamir's
+preferences.
+
 Review the complete merge-base delta and the affected pre-existing code, not
 just the latest commit or changed lines. A green check or prior approval is not
 substitute evidence for correctness.
@@ -89,6 +94,26 @@ third-party implementation. Flag:
 Large additive replacements are a design signal: determine why the old
 machinery survives and whether the implementation can be substantially
 smaller. Do not assume the domain requires the volume of code presented.
+
+Require the rationale and evidence behind non-obvious decisions to live beside
+the behavior they justify. A platform restriction, compatibility exception,
+workaround, dependency choice, or fact learned from another system must explain
+why it exists and cite a source that lets the reader verify the claim. A TODO
+must describe both the deferred work and why it was not done here, including
+the concrete blocker or removal condition when one exists. Delete stale or
+unsupported assertions rather than preserving them as folklore. If explaining
+code requires a thicket of citations to distant owners or systems, challenge
+the boundary and prefer a refactoring that makes its invariants local.
+
+Scrutinize the pull-request description as part of the change. It must tell a
+tight, succinct plain-English story that explains the relevant problem,
+behavior, decisions, and context without uncited facts or unexplained tradeoffs.
+Reject Markdown, section headers, bulleted lists, validation inventories, and
+superfluous descriptions of checks or local commands. Cite only what the reader
+needs to verify: commits in the same repository use unfenced eight-character
+Git SHAs; external repositories, discussions, and other sources use full HTTPS
+URLs. Flag bodies that obscure the final cumulative change beneath historical
+narration, implementation trivia, or unsupported claims.
 
 For `oaipkg`/`oaipackaging` and dependency-universe changes, also apply
 `$shantanu-reviewer`. The direction is to reduce and ultimately retire oaipkg,

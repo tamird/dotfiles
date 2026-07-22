@@ -44,7 +44,7 @@ and reject a compatibility/default that hides a required choice in
 known invariants in types and local control flow instead of `Any`, casts,
 loose maps, boolean modes, checker suppression, or downstream validation.
 
-## Explicit failure and verifiable rationale
+## Explicit failure, decisions, and verifiable rationale
 
 The [gVisor defensive-check review](https://github.com/google/gvisor/pull/1995#discussion_r391310144)
 asks for the real failure path rather than silently accepting an unsupported
@@ -55,8 +55,21 @@ A [protobuf review](https://github.com/gogo/protobuf/pull/341#discussion_r143318
 rejects a comment that merely restates code and asks that it explain why. A
 [configuration review](https://github.com/BrightSpots/rcv/pull/605#discussion_r939713641)
 requests a citation and reproducible update command for a non-obvious input.
-Policy belongs near its owner with a verifiable source; vague comments and
-remote assertions become uncheckable folklore.
+Policy belongs near its owner with a verifiable source; vague comments,
+unsupported facts from elsewhere, and unexplained decisions become
+uncheckable folklore.
+
+The same standard applies to deferred work: a TODO must explain not only what
+remains, but why it could not be completed here and what concrete condition
+would make it actionable. Delete stale comments, and require an inline reason
+for a platform constraint or other non-obvious exception; Tamir made both
+requests in
+[a dependency review](https://github.com/openai/openai/pull/1163240#discussion_r3624669587)
+and
+[the accompanying platform-constraint discussion](https://github.com/openai/openai/pull/1163240#discussion_r3624674799).
+When a local path requires many citations to distant owners, implementations,
+or policies merely to be understood, treat that citation density as evidence
+that the ownership boundary or design should be simplified.
 
 ## Reuse upstream behavior and reject compatibility-shaped complexity
 
