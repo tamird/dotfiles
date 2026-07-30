@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
@@ -21,6 +21,17 @@ JsonObject = dict[str, object]
 MAXIMUM_PROVIDER_CONCURRENCY = 4
 PROVIDER_TIMEOUT_SECONDS = 45
 REPLAY_OVERLAP = timedelta(minutes=5)
+OWNED_COMMENT_FIELDS = "id createdAt updatedAt author{__typename login}body"
+OWNED_REVIEW_FIELDS = "id submittedAt author{__typename login}body state commit{oid}"
+OWNED_INLINE_FIELDS = (
+    "id createdAt updatedAt author{__typename login}body commit{oid}"
+)
+OWNED_THREAD_FIELDS = (
+    "id isResolved isOutdated comments(last:15){"
+    "pageInfo{hasPreviousPage startCursor}nodes{"
+    + OWNED_INLINE_FIELDS
+    + "}}"
+)
 
 
 def _object(value: object, *, context: str) -> JsonObject:
@@ -72,8 +83,28 @@ def review_request_is_outstanding(
 
 
 def has_actionable_feedback(item: JsonObject) -> bool:
-    """An empty approval changes status but does not request owner action."""
-    return item.get("state") != "APPROVED" or bool(str(item.get("body", "")).strip())
+    """Approval prose is status; independently authored comments remain events."""
+    return item.get("state") != "APPROVED"
+
+
+async def complete_previous_pages(
+    connection: JsonObject,
+    fetch: Callable[[str], Awaitable[JsonObject]],
+    *,
+    context: str,
+) -> list[JsonObject]:
+    """Retain every earlier provider page before declaring the source complete."""
+    nodes = _objects(connection.get("nodes"), context=f"{context} nodes")
+    page = _object(connection.get("pageInfo"), context=f"{context} pagination")
+    while page.get("hasPreviousPage") is True:
+        cursor = _string(page.get("startCursor"), context=f"{context} cursor")
+        previous = await fetch(cursor)
+        older = _objects(previous.get("nodes"), context=f"{context} nodes")
+        nodes = older + nodes
+        page = _object(previous.get("pageInfo"), context=f"{context} pagination")
+    if page.get("hasPreviousPage") is not False:
+        raise ValueError(f"{context} pagination is incomplete")
+    return nodes
 
 
 def is_actionable_feedback_actor(
@@ -449,6 +480,115 @@ class GithubReader:
                     events.append(event)
         await self._submit(source, events)
 
+    async def _owned_connection_page(
+        self, node: JsonObject, *, connection: str, cursor: str
+    ) -> JsonObject:
+        """Fetch the page immediately preceding an owned pull-request cursor."""
+        selections = {
+            "comments": OWNED_COMMENT_FIELDS,
+            "reviews": OWNED_REVIEW_FIELDS,
+            "reviewThreads": OWNED_THREAD_FIELDS,
+        }
+        selection = selections.get(connection)
+        if selection is None:
+            raise ValueError("unknown owned pull-request connection")
+        repository = _string(
+            _object(node.get("repository"), context="pull request repository").get(
+                "nameWithOwner"
+            ),
+            context="repository name",
+        )
+        owner, separator, name = repository.partition("/")
+        number = node.get("number")
+        if not separator or not name or not isinstance(number, int):
+            raise ValueError("owned pull request identity is invalid")
+        document = (
+            "query($owner:String!,$name:String!,$number:Int!,$cursor:String!){"
+            "repository(owner:$owner,name:$name){pullRequest(number:$number){"
+            + connection
+            + "(last:50,before:$cursor){pageInfo{hasPreviousPage startCursor}nodes{"
+            + selection
+            + "}}}}}"
+        )
+        response = _object(
+            await self._github(
+                "graphql",
+                "-f",
+                f"query={document}",
+                "-f",
+                f"owner={owner}",
+                "-f",
+                f"name={name}",
+                "-F",
+                f"number={number}",
+                "-f",
+                f"cursor={cursor}",
+            ),
+            context="owned connection response",
+        )
+        data = _object(response.get("data"), context="owned connection data")
+        repo = _object(data.get("repository"), context="owned connection repository")
+        pull = _object(repo.get("pullRequest"), context="owned connection pull request")
+        return _object(pull.get(connection), context=f"owned {connection}")
+
+    async def _owned_thread_page(self, thread_id: str, cursor: str) -> JsonObject:
+        """Fetch earlier inline replies without dropping their immutable roots."""
+        document = (
+            "query($id:ID!,$cursor:String!){node(id:$id){"
+            "...on PullRequestReviewThread{comments(last:50,before:$cursor){"
+            "pageInfo{hasPreviousPage startCursor}nodes{"
+            + OWNED_INLINE_FIELDS
+            + "}}}}}"
+        )
+        response = _object(
+            await self._github(
+                "graphql",
+                "-f",
+                f"query={document}",
+                "-f",
+                f"id={thread_id}",
+                "-f",
+                f"cursor={cursor}",
+            ),
+            context="owned review-thread response",
+        )
+        data = _object(response.get("data"), context="owned review-thread data")
+        thread = _object(data.get("node"), context="owned review thread")
+        return _object(thread.get("comments"), context="owned review-thread comments")
+
+    async def _complete_owned_thread(self, thread: JsonObject) -> None:
+        thread_id = _string(thread.get("id"), context="owned review thread ID")
+        connection = _object(thread.get("comments"), context="owned review-thread comments")
+        comments = await complete_previous_pages(
+            connection,
+            lambda cursor: self._owned_thread_page(thread_id, cursor),
+            context="owned review-thread comments",
+        )
+        connection["nodes"] = comments
+        connection["pageInfo"] = {"hasPreviousPage": False}
+
+    async def _complete_owned_node(self, node: JsonObject) -> None:
+        async def complete(name: str) -> None:
+            connection = _object(node.get(name), context=f"owned {name}")
+            nodes = await complete_previous_pages(
+                connection,
+                lambda cursor: self._owned_connection_page(
+                    node, connection=name, cursor=cursor
+                ),
+                context=f"owned {name}",
+            )
+            connection["nodes"] = nodes
+            connection["pageInfo"] = {"hasPreviousPage": False}
+
+        await asyncio.gather(*(complete(name) for name in ("comments", "reviews", "reviewThreads")))
+        threads = _object(node.get("reviewThreads"), context="owned review threads")
+        await asyncio.gather(
+            *(
+                self._complete_owned_thread(thread)
+                for thread in _objects(threads.get("nodes"), context="owned review threads")
+            )
+        )
+
     async def _owned(self) -> list[JsonObject]:
         async with self.owned_lock:
             now = datetime.now(UTC)
@@ -457,16 +597,19 @@ class GithubReader:
             fields = (
                 "number isDraft updatedAt headRefOid repository{nameWithOwner}"
                 "author{__typename login}"
-                "comments(last:20){nodes{id createdAt updatedAt author{__typename login}body}}"
-                "reviews(last:20){nodes{id submittedAt author{__typename login}"
-                "body state commit{oid}}}"
-                "reviewThreads(last:15){nodes{isResolved isOutdated "
-                "comments(last:15){nodes{id createdAt updatedAt "
-                "author{__typename login}body commit{oid}}}}}"
+                "comments(last:20){pageInfo{hasPreviousPage startCursor}nodes{"
+                + OWNED_COMMENT_FIELDS
+                + "}}reviews(last:20){pageInfo{hasPreviousPage startCursor}nodes{"
+                + OWNED_REVIEW_FIELDS
+                + "}}reviewThreads(last:15){pageInfo{hasPreviousPage startCursor}nodes{"
+                + OWNED_THREAD_FIELDS
+                + "}}"
             )
-            self.owned_nodes = await self._search(
+            nodes = await self._search(
                 f"is:pr is:open author:{self.config.principal}", fields
             )
+            await asyncio.gather(*(self._complete_owned_node(node) for node in nodes))
+            self.owned_nodes = nodes
             self.owned_at = now
             return self.owned_nodes
 

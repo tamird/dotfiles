@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stdout
+from datetime import UTC, datetime
 from io import StringIO
 import json
 import unittest
@@ -10,7 +11,9 @@ from unittest.mock import patch
 
 from codex_notification_watcher.cli import main
 from codex_notification_watcher.slack_threads import (
+    classify_slack_activity,
     classify_slack_pages,
+    discover_active_thread_scopes,
     discover_owned_thread_scopes,
     rendered_slack_messages,
     slack_control_events,
@@ -98,6 +101,206 @@ class SlackThreadIntakeTest(unittest.TestCase):
             ),
         )
 
+    def test_recent_reply_reactivates_old_monitored_root(self) -> None:
+        messages = self.page(
+            [
+                {
+                    "channel": "C01ALLOWED",
+                    "user": "U02AUTHOR",
+                    "ts": "1785432259.446409",
+                    "thread_ts": "1785421919.024249",
+                }
+            ]
+        )
+
+        result = discover_active_thread_scopes(
+            messages,
+            channels=("C01ALLOWED",),
+            observed_since=datetime.fromtimestamp(1785432000, tz=UTC),
+        )
+
+        self.assertEqual(result, ("slack:C01ALLOWED:1785421919.024249",))
+
+    def test_activity_discovery_rejects_unmonitored_channel(self) -> None:
+        messages = self.page(
+            [
+                {
+                    "channel": "C02REMOVED",
+                    "user": "U02AUTHOR",
+                    "ts": "1785432259.446409",
+                }
+            ]
+        )
+
+        result = discover_active_thread_scopes(
+            messages,
+            channels=("C01ALLOWED",),
+            observed_since=datetime.fromtimestamp(1785432000, tz=UTC),
+            protected=("slack:C02REMOVED:1785421919.024249",),
+        )
+
+        self.assertEqual(result, ())
+
+    def test_activity_discovery_retains_protected_dormant_root(self) -> None:
+        result = discover_active_thread_scopes(
+            self.page([]),
+            channels=("C01ALLOWED",),
+            observed_since=datetime.fromtimestamp(1785432000, tz=UTC),
+            protected=("slack:C01ALLOWED:1785421919.024249",),
+        )
+
+        self.assertEqual(result, ("slack:C01ALLOWED:1785421919.024249",))
+
+    def test_activity_discovery_uses_reply_time_and_replay_boundary(self) -> None:
+        boundary = datetime.fromtimestamp(1785432000, tz=UTC)
+        messages = self.page(
+            [
+                {
+                    "channel": "C01ALLOWED",
+                    "user": "U02AUTHOR",
+                    "ts": "1785432000.000000",
+                    "thread_ts": "1785000000.000000",
+                },
+                {
+                    "channel": "C01ALLOWED",
+                    "user": "U02AUTHOR",
+                    "ts": "1785431999.999999",
+                    "thread_ts": "1785000001.000000",
+                },
+            ]
+        )
+
+        result = discover_active_thread_scopes(
+            messages,
+            channels=("C01ALLOWED",),
+            observed_since=boundary,
+        )
+
+        self.assertEqual(result, ("slack:C01ALLOWED:1785000000.000000",))
+
+    def test_complete_search_reactivates_old_thread(self) -> None:
+        provider_page = {
+            "results": (
+                "### Result 1 of 1\n"
+                "Channel: #project (ID: C01ALLOWED)\n"
+                "From: Reviewer (ID: U02AUTHOR)\n"
+                "Message_ts: 1785432259.446409\n"
+                "Permalink: https://slack.example/?thread_ts=1785421919.024249\n"
+                "Text: please review\n"
+            ),
+            "pagination_info": "There are no more search results.",
+        }
+
+        result = classify_slack_activity(
+            {
+                "channels": ["C01ALLOWED"],
+                "observed_since": "1785432000.000000",
+                "provider_page": provider_page,
+            }
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "scopes": ["slack:C01ALLOWED:1785421919.024249"],
+                "message_count": 1,
+            },
+        )
+
+    def test_activity_discovery_rejects_unfinished_search(self) -> None:
+        with self.assertRaisesRegex(ValueError, "pagination is incomplete"):
+            _ = classify_slack_activity(
+                {
+                    "channels": ["C01ALLOWED"],
+                    "observed_since": "1785432000.000000",
+                    "provider_page": {
+                        "results": "",
+                        "pagination_info": "For the next page use cursor: `page-two`",
+                    },
+                }
+            )
+
+    def test_principal_instruction_in_old_project_thread_is_a_control_task(
+        self,
+    ) -> None:
+        channel = "C0BD2U1KYTD"
+        root = "1785338469.323499"
+        timestamp = "1785439798.896949"
+        result = classify_slack_pages(
+            {
+                "principal": self.owner,
+                "items": [
+                    {
+                        "source_id": "slack_monitored_channels",
+                        "kind": "control",
+                        "principal_directive": True,
+                        "channel": channel,
+                        "root": root,
+                        "provider_page": self.page(
+                            [
+                                {
+                                    "channel": channel,
+                                    "user": self.owner,
+                                    "ts": root,
+                                    "text": (
+                                        "Review requested. "
+                                        "*Sent using* <@U01BOT|ChatGPT>"
+                                    ),
+                                },
+                                {
+                                    "channel": channel,
+                                    "user": self.owner,
+                                    "ts": timestamp,
+                                    "thread_ts": root,
+                                    "text": (
+                                        "This CI failure here is not causal, "
+                                        "but please flag it to the owning team."
+                                    ),
+                                },
+                            ]
+                        ),
+                    }
+                ],
+            }
+        )
+
+        events = result["results"][0]["events"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["category"], "control_task")
+        self.assertEqual(events[0]["event_id"], f"slack:{channel}:{root}:{timestamp}")
+
+    def test_principal_project_conversation_does_not_create_work(self) -> None:
+        result = classify_slack_pages(
+            {
+                "principal": self.owner,
+                "items": [
+                    {
+                        "source_id": "slack_monitored_channels",
+                        "kind": "control",
+                        "principal_directive": True,
+                        "channel": "C01PROJECT",
+                        "root": "1785338469.323499",
+                        "provider_page": self.page(
+                            [
+                                {
+                                    "user": self.owner,
+                                    "ts": "1785439798.896949",
+                                    "text": "What do you think about this approach?",
+                                },
+                                {
+                                    "user": "someone-else",
+                                    "ts": "1785439799.000000",
+                                    "text": "Please deploy my change.",
+                                },
+                            ]
+                        ),
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(result["results"][0]["events"], [])
+
     def test_watched_top_level_review_request_requires_no_mention(self) -> None:
         message = {
             "user": "actual-human",
@@ -110,6 +313,39 @@ class SlackThreadIntakeTest(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["category"], "review_request")
         self.assertEqual(events[0]["head"], self.head)
+
+    def test_closed_link_does_not_hide_open_review_in_same_message(self) -> None:
+        message = {
+            "user": "actual-human",
+            "ts": "1785370665.677089",
+            "text": (
+                "please review https://github.com/example/repository/pull/41 "
+                "and https://github.com/example/repository/pull/42"
+            ),
+        }
+
+        events = self.events(self.page([message]))
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["subject_key"], self.subject)
+
+    def test_closed_review_links_are_not_actionable(self) -> None:
+        message = {
+            "user": "actual-human",
+            "ts": "1785370665.677089",
+            "text": "please review https://github.com/example/repository/pull/41",
+        }
+
+        self.assertEqual(self.events(self.page([message])), [])
+
+    def test_attachment_only_message_is_not_a_review_request(self) -> None:
+        message = {
+            "user": "actual-human",
+            "ts": "1785370665.677089",
+            "text": "",
+        }
+
+        self.assertEqual(self.events(self.page([message])), [])
 
     def test_explicit_human_stamp_request_is_a_review_request(self) -> None:
         message = {
@@ -757,6 +993,75 @@ class SlackThreadIntakeTest(unittest.TestCase):
             [records[0]["events"][0]["event_id"]],
         )
         self.assertEqual(records[1]["events"][0]["category"], "control_task")
+
+    def test_feedback_only_channel_never_turns_quoted_reviews_into_requests(self) -> None:
+        item = self.provider_item(
+            text=(
+                "My request for re review on "
+                "https://github.com/example/repository/pull/42 was overly nit picky."
+            )
+        )
+        item["feedback_only"] = True
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        if not isinstance(records, list):
+            self.fail("classified Slack results must be a list")
+        first = records[0]
+        self.assertIsInstance(first, dict)
+        if not isinstance(first, dict):
+            self.fail("classified Slack result must be an object")
+        events = first.get("events")
+        self.assertIsInstance(events, list)
+        if not isinstance(events, list):
+            self.fail("classified Slack events must be a list")
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertIsInstance(event, dict)
+        if not isinstance(event, dict):
+            self.fail("classified Slack event must be an object")
+        self.assertEqual(event.get("category"), "owned_feedback")
+        self.assertNotIn("reviewer", event)
+
+    def test_feedback_only_flag_requires_verified_boolean(self) -> None:
+        item = self.provider_item()
+        item["feedback_only"] = "yes"
+
+        with self.assertRaisesRegex(ValueError, "feedback-only"):
+            _ = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+    def test_unowned_project_conversation_does_not_create_owned_feedback(self) -> None:
+        item = self.provider_item(text="Discussion of https://github.com/example/repository/pull/42")
+        item["owned_subjects"] = []
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        if not isinstance(records, list):
+            self.fail("classified Slack results must be a list")
+        self.assertEqual(records[0]["events"], [])
+
+    def test_unowned_explicit_review_request_remains_actionable(self) -> None:
+        item = self.provider_item()
+        item["owned_subjects"] = []
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        if not isinstance(records, list):
+            self.fail("classified Slack results must be a list")
+        self.assertEqual(records[0]["events"][0]["category"], "review_request")
+
+    def test_owned_subject_requires_its_verified_exact_head(self) -> None:
+        item = self.provider_item()
+        item["owned_subjects"] = ["another/repository#99"]
+
+        with self.assertRaisesRegex(ValueError, "authenticated head"):
+            _ = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
 
     def test_control_source_classifies_principal_replies_in_existing_threads(
         self,

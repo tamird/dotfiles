@@ -27,6 +27,10 @@ class RuntimeLeadershipTests(unittest.TestCase):
         )
         self.database = self.runtime / "review-monitor" / "notifications.sqlite3"
         self.database.parent.mkdir(parents=True)
+        self.local = (
+            self.home / ".cache" / "codex" / "review-monitor" / "notifications.sqlite3"
+        )
+        self.local.parent.mkdir(parents=True)
         self.home_patch = patch(
             "codex_notification_watcher.config.Path.home", return_value=self.home
         )
@@ -59,6 +63,17 @@ class RuntimeLeadershipTests(unittest.TestCase):
         with patch("codex_notification_watcher.config.socket.gethostname", return_value="follower"):
             with self.assertRaisesRegex(PermissionError, "elected leader"):
                 with Store(self.database):
+                    pass
+
+    def test_follower_cannot_open_machine_local_canonical_writer(self) -> None:
+        self.elect()
+        with patch("codex_notification_watcher.config.socket.gethostname", return_value="leader"):
+            with Store(self.local, initialize=True):
+                pass
+
+        with patch("codex_notification_watcher.config.socket.gethostname", return_value="follower"):
+            with self.assertRaisesRegex(PermissionError, "elected leader"):
+                with Store(self.local):
                     pass
 
     def test_follower_can_read_shared_health_without_writing(self) -> None:

@@ -331,6 +331,14 @@ class StateBackupTests(unittest.TestCase):
     def test_notification_database_has_transactional_standalone_snapshot(self) -> None:
         sources = backup.database_sources(self.configuration)
         notification = next(source for source in sources if source.name == "notifications")
+        self.assertEqual(
+            notification.source,
+            self.codex_home.parent
+            / ".cache"
+            / "codex"
+            / "review-monitor"
+            / "notifications.sqlite3",
+        )
         notification.source.parent.mkdir(parents=True)
         with sqlite3.connect(str(notification.source)) as database:
             database.execute("PRAGMA journal_mode=WAL")
@@ -352,6 +360,117 @@ class StateBackupTests(unittest.TestCase):
             )
         self.assertFalse(Path(str(notification.destination) + "-wal").exists())
         self.assertFalse(Path(str(notification.destination) + "-shm").exists())
+
+    def test_notification_snapshot_is_throttled_for_one_day(self) -> None:
+        notification = next(
+            source
+            for source in backup.database_sources(self.configuration)
+            if source.name == "notifications"
+        )
+        notification.source.parent.mkdir(parents=True)
+        with sqlite3.connect(str(notification.source)) as database:
+            database.execute("CREATE TABLE receipts(value TEXT NOT NULL)")
+            database.execute("INSERT INTO receipts VALUES ('initial')")
+        backup.backup_database(notification, self.configuration)
+        with sqlite3.connect(str(notification.source)) as database:
+            database.execute("INSERT INTO receipts VALUES ('later')")
+        modified = time.time_ns() + 1_000_000_000
+        os.utime(notification.source, ns=(modified, modified))
+
+        result = backup.backup_database(
+            notification,
+            self.configuration,
+            now=notification.destination.stat().st_mtime + 3_600,
+        )
+
+        self.assertEqual(result["status"], "throttled")
+        self.assertEqual(result["interval_seconds"], 86_400)
+
+    def create_notification_database(self, path: Path, value: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(str(path)) as database:
+            for name in backup.NOTIFICATION_TABLES:
+                database.execute(
+                    "CREATE TABLE " + name + " (value TEXT NOT NULL)"
+                )
+                database.execute("INSERT INTO " + name + " VALUES (?)", (value,))
+
+    def test_notification_migration_preserves_rows_and_removes_shared_live_file(
+        self,
+    ) -> None:
+        self.elect_leader()
+        source = self.destination / "review-monitor" / "notifications.sqlite3"
+        self.create_notification_database(source, "authoritative")
+
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            with patch.object(backup, "_has_open_database_handles", return_value=False):
+                with patch.object(backup, "_has_open_path", return_value=False):
+                    result = backup.migrate_notifications(self.configuration)
+
+        local = (
+            self.codex_home.parent
+            / ".cache"
+            / "codex"
+            / "review-monitor"
+            / "notifications.sqlite3"
+        )
+        snapshot = self.destination / "database-snapshots" / "notifications.sqlite"
+        self.assertEqual(result["status"], "migrated")
+        self.assertTrue(local.is_file())
+        self.assertTrue(snapshot.is_file())
+        self.assertFalse(source.exists())
+        with sqlite3.connect(str(local)) as database:
+            self.assertEqual(
+                database.execute("SELECT value FROM receipts").fetchall(),
+                [("authoritative",)],
+            )
+
+    def test_notification_migration_refuses_an_active_shared_writer(self) -> None:
+        self.elect_leader()
+        source = self.destination / "review-monitor" / "notifications.sqlite3"
+        self.create_notification_database(source, "authoritative")
+
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            with patch.object(backup, "_has_open_database_handles", return_value=True):
+                with self.assertRaisesRegex(PermissionError, "stop the notification"):
+                    backup.migrate_notifications(self.configuration)
+
+        self.assertTrue(source.is_file())
+        self.assertFalse(
+            (
+                self.codex_home.parent
+                / ".cache"
+                / "codex"
+                / "review-monitor"
+                / "notifications.sqlite3"
+            ).exists()
+        )
+
+    def test_notification_migration_rejects_divergent_existing_local_state(
+        self,
+    ) -> None:
+        self.elect_leader()
+        source = self.destination / "review-monitor" / "notifications.sqlite3"
+        self.create_notification_database(source, "authoritative")
+        local = (
+            self.codex_home.parent
+            / ".cache"
+            / "codex"
+            / "review-monitor"
+            / "notifications.sqlite3"
+        )
+        self.create_notification_database(local, "different")
+        with sqlite3.connect(str(local)) as database:
+            database.execute("DELETE FROM receipts")
+
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            with patch.object(backup, "_has_open_database_handles", return_value=False):
+                with patch.object(backup, "_has_open_path", return_value=False):
+                    with self.assertRaisesRegex(FileExistsError, "already exists"):
+                        backup.migrate_notifications(self.configuration)
+
+        self.assertTrue(source.is_file())
+        self.assertTrue(local.is_file())
 
     def test_paginated_thread_history_is_backed_up_when_present(self) -> None:
         connection = self.create_database("thread_history_1.sqlite", wal=True)

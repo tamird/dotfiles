@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Sequence
 import ctypes
 import hashlib
 import json
@@ -11,18 +12,21 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import subprocess
 import sys
-import tempfile
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Union, cast
 
 
 AT_FDCWD = -2
 RENAME_SWAP = 0x00000002
 BLOCK_SIZE = 1024 * 1024
-Fingerprint = Dict[str, Tuple[str, str, int, int]]
+RECOVERED_REF = "refs/recovered/pre-migration-main"
+Fingerprint = dict[str, tuple[str, str, int, int]]
 
 
-def fingerprint(root: Path) -> Tuple[Fingerprint, int]:
+def fingerprint(
+    root: Path, *, exclude: frozenset[str] = frozenset()
+) -> tuple[Fingerprint, int]:
     """Record every directory, regular file, and preserved symlink once."""
     if root.is_symlink() or not root.is_dir():
         raise NotADirectoryError(str(root))
@@ -31,6 +35,9 @@ def fingerprint(root: Path) -> Tuple[Fingerprint, int]:
     total = 0
     for parent, directories, files in os.walk(root, followlinks=False):
         current = Path(parent)
+        if current == root:
+            directories[:] = [name for name in directories if name not in exclude]
+            files = [name for name in files if name not in exclude]
         for name in sorted(directories + files):
             candidate = current / name
             relative = str(candidate.relative_to(root))
@@ -90,7 +97,7 @@ def migrate(
     destination: Path,
     *,
     swap: Callable[[Path, Path], None] = exchange,
-) -> Dict[str, Union[str, int]]:
+) -> dict[str, Union[str, int]]:
     """Verify a complete Git repository before atomically replacing its path."""
     if source.is_symlink():
         if source.resolve(strict=True) != destination.resolve(strict=True):
@@ -99,10 +106,10 @@ def migrate(
         return {"status": "already_migrated", "files": len(entries), "bytes": total}
     if not source.is_dir() or not (source / ".git").is_dir():
         raise NotADirectoryError("memory source must be a complete Git repository")
-    if destination.exists() or destination.is_symlink():
-        raise FileExistsError("refusing to overwrite existing durable memories")
     if not destination.parent.is_dir() or destination.parent.is_symlink():
         raise NotADirectoryError("durable memory parent must already exist")
+    if destination.is_symlink() or (destination.exists() and not destination.is_dir()):
+        raise FileExistsError("durable memory path is not a real directory")
 
     expected, total = fingerprint(source)
     temporary_link = source.with_name(
@@ -111,18 +118,27 @@ def migrate(
     if temporary_link.exists() or temporary_link.is_symlink():
         raise FileExistsError("refusing to overwrite an existing migration entry")
 
-    with tempfile.TemporaryDirectory(
-        prefix=".memories-migration.", dir=str(destination.parent)
-    ) as staging:
-        staged = Path(staging) / "memories"
-        shutil.copytree(source, staged, symlinks=True, copy_function=shutil.copy2)
-        actual, _ = fingerprint(staged)
-        if actual != expected:
-            raise RuntimeError("staged memories do not match the source")
-        if fingerprint(source)[0] != expected:
-            raise RuntimeError("memory source changed during migration")
-        os.chmod(staged, 0o700)
-        os.replace(staged, destination)
+    if not destination.exists():
+        destination.mkdir(mode=0o700)
+    destination_identity = (destination.stat().st_dev, destination.stat().st_ino)
+    existing, _ = fingerprint(destination)
+    if existing and existing != expected:
+        raise FileExistsError("existing durable memories differ from the source")
+    if not existing:
+        _ = shutil.copytree(
+            source,
+            destination,
+            symlinks=True,
+            copy_function=shutil.copy2,
+            dirs_exist_ok=True,
+        )
+        os.chmod(destination, 0o700)
+    if fingerprint(destination)[0] != expected:
+        raise RuntimeError("durable memories do not match the source")
+    if fingerprint(source)[0] != expected:
+        raise RuntimeError("memory source changed during migration")
+    if (destination.stat().st_dev, destination.stat().st_ino) != destination_identity:
+        raise RuntimeError("durable memory directory identity changed")
 
     exchanged = False
     try:
@@ -137,6 +153,11 @@ def migrate(
             raise RuntimeError("native memory path did not resolve to durable memory")
         if fingerprint(destination)[0] != expected:
             raise RuntimeError("durable memories changed during atomic exchange")
+        if (
+            destination.stat().st_dev,
+            destination.stat().st_ino,
+        ) != destination_identity:
+            raise RuntimeError("durable memory directory identity changed")
         if fingerprint(temporary_link)[0] != expected:
             raise RuntimeError("original memories changed during atomic exchange")
         shutil.rmtree(temporary_link)
@@ -150,19 +171,197 @@ def migrate(
     return {"status": "migrated", "files": len(expected), "bytes": total}
 
 
+def _git(directory: Path, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", "--git-dir", str(directory), *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or "Git repository validation failed")
+    return result.stdout
+
+
+def _working_entries(root: Path) -> Fingerprint:
+    return fingerprint(root, exclude=frozenset({".git", ".git (1)"}))[0]
+
+
+def _stop_duplicate_fsmonitor(directory: Path, worktree: Path) -> None:
+    socket = directory / "fsmonitor--daemon-common-v1.ipc"
+    if not socket.exists():
+        return
+    if not stat.S_ISSOCK(socket.stat().st_mode):
+        raise ValueError("duplicate Git fsmonitor path is not a socket")
+    _ = _git(
+        directory,
+        "--work-tree=" + str(worktree),
+        "fsmonitor--daemon",
+        "stop",
+    )
+    if socket.exists():
+        raise RuntimeError("duplicate Git fsmonitor did not stop")
+
+
+def _require_unlocked(directory: Path) -> None:
+    for parent, _, files in os.walk(directory, followlinks=False):
+        for name in files:
+            if not name.endswith(".lock"):
+                continue
+            result = subprocess.run(
+                ["/usr/sbin/lsof", "-Fp", "--", str(Path(parent) / name)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                raise RuntimeError("duplicate Git repository has an active lock")
+            if result.returncode != 1:
+                raise RuntimeError("could not verify duplicate Git repository locks")
+
+
+def recover_restored(
+    source: Path,
+    destination: Path,
+    healthy_git: Path,
+    *,
+    swap: Callable[[Path, Path], None] = exchange,
+) -> dict[str, Union[str, int]]:
+    """Reconcile a restored provider root without replacing its directory."""
+    if source.is_symlink() and source.resolve(strict=True) == destination.resolve(
+        strict=True
+    ):
+        return {"status": "already_recovered"}
+    if source.is_symlink() or not source.is_dir():
+        raise NotADirectoryError("native memories must be a real directory")
+    if destination.is_symlink() or not destination.is_dir():
+        raise NotADirectoryError("restored memories must be a real directory")
+    canonical_git = destination / ".git"
+    duplicate_git = destination / ".git (1)"
+    source_git = source / ".git"
+    if not canonical_git.is_dir() or not healthy_git.is_dir():
+        raise NotADirectoryError("recovery requires complete Git repositories")
+    if duplicate_git.exists() and (
+        duplicate_git.is_symlink() or not duplicate_git.is_dir()
+    ):
+        raise ValueError("duplicate Git repository is not a real directory")
+
+    source_working = _working_entries(source)
+    destination_working = _working_entries(destination)
+    if any(
+        destination_working.get(path) != value for path, value in source_working.items()
+    ):
+        raise ValueError("restored memories do not contain the current working files")
+    source_index = _git(source_git, "ls-files", "--stage", "-z")
+    canonical_index = _git(canonical_git, "ls-files", "--stage", "-z")
+    if source_index != canonical_index:
+        raise ValueError("restored memories do not contain the current staged files")
+
+    canonical_identity = (canonical_git.stat().st_dev, canonical_git.stat().st_ino)
+    destination_identity = (destination.stat().st_dev, destination.stat().st_ino)
+    original_head = _git(canonical_git, "rev-parse", "HEAD").strip()
+    recovered_head = _git(healthy_git, "rev-parse", "HEAD").strip()
+    _ = _git(canonical_git, "fsck", "--full", "--no-reflogs", "--no-progress")
+    _ = _git(healthy_git, "fsck", "--full", "--no-reflogs", "--no-progress")
+    if duplicate_git.exists():
+        _ = _git(duplicate_git, "fsck", "--full", "--no-reflogs", "--no-progress")
+        if _git(duplicate_git, "rev-parse", "HEAD").strip() != recovered_head:
+            raise ValueError("duplicate Git repository contains another commit history")
+        _require_unlocked(duplicate_git)
+
+    _ = _git(
+        canonical_git,
+        "fetch",
+        "--no-tags",
+        "--no-write-fetch-head",
+        str(healthy_git),
+        "refs/heads/main:" + RECOVERED_REF,
+    )
+    if _git(canonical_git, "rev-parse", "HEAD").strip() != original_head:
+        raise RuntimeError("canonical memory HEAD changed during recovery")
+    if _git(canonical_git, "rev-parse", RECOVERED_REF).strip() != recovered_head:
+        raise RuntimeError("pre-migration memory history was not recovered")
+    if _git(canonical_git, "ls-files", "--stage", "-z") != canonical_index:
+        raise RuntimeError("canonical staged memory state changed during recovery")
+    _ = _git(canonical_git, "fsck", "--full", "--no-reflogs", "--no-progress")
+    if (destination.stat().st_dev, destination.stat().st_ino) != destination_identity:
+        raise RuntimeError("restored memory directory identity changed")
+    if (
+        canonical_git.stat().st_dev,
+        canonical_git.stat().st_ino,
+    ) != canonical_identity:
+        raise RuntimeError("restored Git directory identity changed")
+
+    if duplicate_git.exists():
+        _stop_duplicate_fsmonitor(duplicate_git, destination)
+        shutil.rmtree(duplicate_git)
+    if _working_entries(source) != source_working:
+        raise RuntimeError("native memories changed during recovery")
+    recovered_working = _working_entries(destination)
+    if any(
+        recovered_working.get(path) != value for path, value in source_working.items()
+    ):
+        raise RuntimeError("restored memories changed during recovery")
+
+    temporary = source.with_name("." + source.name + ".recovery." + str(os.getpid()))
+    if temporary.exists() or temporary.is_symlink():
+        raise FileExistsError("refusing to overwrite an existing recovery entry")
+    exchanged = False
+    try:
+        os.symlink(destination, temporary, target_is_directory=True)
+        swap(source, temporary)
+        exchanged = True
+        if not source.is_symlink() or source.resolve(
+            strict=True
+        ) != destination.resolve(strict=True):
+            raise RuntimeError("native memory path did not resolve to restored memory")
+        if _working_entries(temporary) != source_working:
+            raise RuntimeError("native memories changed during atomic recovery")
+        if (
+            destination.stat().st_dev,
+            destination.stat().st_ino,
+        ) != destination_identity:
+            raise RuntimeError("restored memory directory identity changed")
+        shutil.rmtree(temporary)
+    except BaseException:
+        if exchanged:
+            swap(source, temporary)
+        if temporary.is_symlink():
+            temporary.unlink()
+        raise
+
+    return {
+        "status": "recovered",
+        "files": len(source_working),
+        "head": original_head,
+        "recovered_head": recovered_head,
+    }
+
+
 def main(arguments: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    _ = parser.add_argument("--recover-restored", action="store_true")
+    _ = parser.add_argument("--git-source", type=Path)
     try:
-        parser.parse_args(arguments)
+        options = parser.parse_args(arguments)
     except SystemExit as error:
         return 0 if error.code == 0 else 2
 
     home = Path.home()
     try:
-        result = migrate(
-            home / ".codex" / "memories",
-            home / "Google Drive" / "My Drive" / "Codex" / "memories",
-        )
+        source = home / ".codex" / "memories"
+        destination = home / "Google Drive" / "My Drive" / "Codex" / "memories"
+        if cast(bool, options.recover_restored):
+            healthy_git = cast(Union[Path, None], options.git_source)
+            result = recover_restored(
+                source,
+                destination,
+                healthy_git if healthy_git is not None else home / ".Trash" / ".git",
+            )
+        elif cast(Union[Path, None], options.git_source) is not None:
+            raise ValueError("--git-source requires --recover-restored")
+        else:
+            result = migrate(source, destination)
     except (OSError, RuntimeError, ValueError) as error:
         print("Codex memory migration stopped: " + str(error), file=sys.stderr)
         return 1

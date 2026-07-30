@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import UTC, datetime
 import re
 from typing import cast
@@ -43,6 +44,11 @@ _PERSONAL_REVIEW_REQUEST = re.compile(
     r"|\b(?:could|can) you review\b|\bplease review\b"
     r"|\breview (?:this|that|it|my)\b|\btake another look\b"
     r"|\b(?:can|could) (?:i|we) get (?:a )?stamp\b)",
+    re.IGNORECASE,
+)
+_PRINCIPAL_DIRECTIVE = re.compile(
+    r"\b(?:please\s+(?:flag|fix|address|investigate|review|post|send|rebase)"
+    r"|(?:can|could)\s+you\s+(?:flag|fix|address|investigate|review|post|send|rebase))\b",
     re.IGNORECASE,
 )
 _SEARCH_RESULT = re.compile(r"^### Result [0-9]+ of [0-9]+\s*$", re.MULTILINE)
@@ -239,6 +245,66 @@ def discover_owned_thread_scopes(
     return tuple(sorted(scopes))
 
 
+def discover_active_thread_scopes(
+    messages: object,
+    *,
+    channels: Collection[str],
+    observed_since: datetime,
+    protected: Collection[str] = (),
+) -> tuple[str, ...]:
+    """Retain authorized changed or protected roots, including old-thread replies."""
+    allowed = frozenset(channels)
+    scopes: set[str] = set()
+
+    for scope in protected:
+        parts = scope.split(":")
+        if len(parts) == 3 and parts[0] == "slack" and parts[1] in allowed:
+            scopes.add(scope)
+
+    for value in _complete_messages(messages):
+        message = object_mapping(value, description="Slack activity message")
+        channel = required_string(message.get("channel"), description="Slack channel")
+        if channel not in allowed:
+            continue
+        timestamp = required_string(message.get("ts"), description="Slack timestamp")
+        if _message_timestamp(timestamp) < observed_since:
+            continue
+        root = required_string(
+            message.get("thread_ts", timestamp), description="Slack thread root"
+        )
+        scopes.add(f"slack:{channel}:{root}")
+
+    return tuple(sorted(scopes))
+
+
+def classify_slack_activity(value: object) -> dict[str, object]:
+    """Plan hydration from a completely paginated authenticated search."""
+    request = object_mapping(value, description="Slack activity discovery")
+    supplied_channels = request.get("channels")
+    if not isinstance(supplied_channels, list):
+        raise ValueError("Slack activity channels must be a list")
+    channels = tuple(
+        required_string(channel, description="Slack activity channel")
+        for channel in cast(list[object], supplied_channels)
+    )
+    supplied_protected = request.get("protected", [])
+    if not isinstance(supplied_protected, list):
+        raise ValueError("Slack activity protected scopes must be a list")
+    protected = tuple(
+        required_string(scope, description="Slack protected scope")
+        for scope in cast(list[object], supplied_protected)
+    )
+    since = _message_timestamp(request.get("observed_since"))
+    page = rendered_slack_messages(request.get("provider_page"))
+    scopes = discover_active_thread_scopes(
+        page,
+        channels=channels,
+        observed_since=since,
+        protected=protected,
+    )
+    return {"scopes": list(scopes), "message_count": len(_complete_messages(page))}
+
+
 def slack_thread_events(
     *,
     channel: str,
@@ -248,6 +314,8 @@ def slack_thread_events(
     subject_heads: dict[str, str],
     direct: bool = False,
     review_channel: bool = False,
+    feedback_only: bool = False,
+    owned_subjects: Collection[str] | None = None,
 ) -> list[dict[str, object]]:
     """Keep genuine human root/reply requests independent of other reactions."""
     source_channel = required_string(channel, description="Slack channel")
@@ -264,8 +332,23 @@ def slack_thread_events(
         actor = message.get("human_actor", message.get("user"))
         if not isinstance(actor, str) or not actor:
             continue
-        text = required_string(message.get("text"), description="Slack message text")
-        found = _PULL_REQUEST.search(text)
+        body = message.get("text")
+        if isinstance(body, str) and not body.strip():
+            continue
+        text = required_string(body, description="Slack message text")
+        matches = tuple(_PULL_REQUEST.finditer(text))
+        found = next(
+            (
+                match
+                for match in matches
+                if (
+                    f"{match.group('owner')}/{match.group('repository')}"
+                    f"#{match.group('number')}"
+                )
+                in subject_heads
+            ),
+            None,
+        )
         subject: str | None = None
         if found is not None:
             subject = (
@@ -274,6 +357,8 @@ def slack_thread_events(
             )
             inherited_subject = subject
         else:
+            if matches:
+                continue
             subject = inherited_subject
         if actor == owner:
             continue
@@ -310,11 +395,18 @@ def slack_thread_events(
         automation_only = (
             _CODEX_MENTION.search(text) is not None and not principal_mentioned
         )
-        review_request = not automation_only and (
+        review_request = not feedback_only and not automation_only and (
             principal_mentioned
             or _PERSONAL_REVIEW_REQUEST.search(text) is not None
             or (review_channel and found is not None)
         )
+        if (
+            not review_request
+            and not feedback_only
+            and owned_subjects is not None
+            and subject not in owned_subjects
+        ):
+            continue
         event_id = f"slack:{source_channel}:{source_root}:{timestamp}"
         event: dict[str, object] = {
             "verified": True,
@@ -336,7 +428,7 @@ def slack_thread_events(
         events.append(event)
         if review_request:
             seen_subjects = {subject}
-            for match in _PULL_REQUEST.finditer(text):
+            for match in matches:
                 additional_subject = (
                     f"{match.group('owner')}/{match.group('repository')}"
                     f"#{match.group('number')}"
@@ -345,9 +437,7 @@ def slack_thread_events(
                     continue
                 additional_head = subject_heads.get(additional_subject)
                 if additional_head is None:
-                    raise ValueError(
-                        "Slack pull request lacks its authenticated exact head"
-                    )
+                    continue
                 additional_event = dict(event)
                 additional_event_id = f"{event_id}:{additional_subject}"
                 additional_event["event_id"] = additional_event_id
@@ -382,6 +472,9 @@ def classify_slack_pages(value: object) -> dict[str, object]:
         direct = item.get("direct", False)
         if not isinstance(direct, bool):
             raise ValueError("Slack direct-message classification must be a boolean")
+        feedback_only = item.get("feedback_only", False)
+        if not isinstance(feedback_only, bool):
+            raise ValueError("Slack feedback-only classification must be a boolean")
         heads_value = item.get("subject_heads", {})
         heads_record = object_mapping(heads_value, description="Slack subject heads")
         subject_heads: dict[str, str] = {}
@@ -391,6 +484,17 @@ def classify_slack_pages(value: object) -> dict[str, object]:
             if _OBJECT_ID.fullmatch(head) is None:
                 raise ValueError("Slack pull request head must be a complete SHA")
             subject_heads[subject_key] = head
+        owned_value = item.get("owned_subjects")
+        owned_subjects: frozenset[str] | None = None
+        if owned_value is not None:
+            if not isinstance(owned_value, list):
+                raise ValueError("Slack owned subjects must be a list")
+            owned_subjects = frozenset(
+                required_string(subject, description="Slack owned pull request")
+                for subject in cast(list[object], owned_value)
+            )
+            if not owned_subjects.issubset(subject_heads):
+                raise ValueError("Slack owned pull request lacks its authenticated head")
         page = rendered_slack_messages(
             item.get("provider_page"), channel=channel, root=root
         )
@@ -398,12 +502,22 @@ def classify_slack_pages(value: object) -> dict[str, object]:
         events: list[dict[str, object]]
         owned_scopes: tuple[str, ...] = ()
         control_source = source_id == "slack_user_work_log_tasks"
-        if kind == "control" and not control_source:
+        monitored_source = source_id == "slack_monitored_channels"
+        monitored_directive = monitored_source and item.get("principal_directive") is True
+        if kind == "control" and not (control_source or monitored_directive):
             raise ValueError("Slack user tasks require an authenticated control source")
         if kind in {"thread", "control"} and control_source:
             events = slack_control_events(
                 channel=channel, root=root, messages=page, principal=principal
             )
+        elif kind == "control" and monitored_directive:
+            events = [
+                event
+                for event in slack_control_events(
+                    channel=channel, root=root, messages=page, principal=principal
+                )
+                if _PRINCIPAL_DIRECTIVE.search(str(event["body"])) is not None
+            ]
         elif kind == "thread":
             events = slack_thread_events(
                 channel=channel,
@@ -412,6 +526,8 @@ def classify_slack_pages(value: object) -> dict[str, object]:
                 principal=principal,
                 subject_heads=subject_heads,
                 direct=direct,
+                feedback_only=feedback_only,
+                owned_subjects=owned_subjects,
                 review_channel=(
                     source_id == "slack_eng_acceleration_reviews"
                     or item.get("review_channel") is True

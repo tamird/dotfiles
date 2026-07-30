@@ -2628,20 +2628,33 @@ class NotificationWatcherTest(unittest.TestCase):
     ) -> None:
         self.assertEqual(RuntimeConfig(self.path).maximum_source_age_seconds, 120)
 
-    def test_runtime_configuration_defaults_to_shared_google_drive(self) -> None:
+    def test_runtime_configuration_defaults_to_machine_local_cache(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
             configuration = RuntimeConfig.from_environment()
 
         self.assertEqual(
             configuration.database,
             Path.home()
-            / "Google Drive"
-            / "My Drive"
-            / "Codex"
-            / "runtime"
+            / ".cache"
+            / "codex"
             / "review-monitor"
             / "notifications.sqlite3",
         )
+
+    def test_explicit_database_does_not_require_documents_link(self) -> None:
+        missing_home = Path(self.directory.name) / "home"
+        output = StringIO()
+
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch.object(Path, "home", return_value=missing_home),
+            redirect_stdout(output),
+        ):
+            result = main(["--database", str(self.path), "stats"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(json.loads(output.getvalue())["sources"], 0)
+        self.assertFalse((missing_home / "Documents").exists())
 
     def test_runtime_configuration_retains_explicit_source_health_override(
         self,

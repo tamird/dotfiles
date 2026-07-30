@@ -30,6 +30,8 @@ complete rotated-segment, archived-session, attachment, and session-index stores
 into Google Drive without copying them or interrupting their native paths.
 Follower bootstrap invokes the same script with `--link` to connect all those
 stores without discarding nonempty local state or claiming backup leadership.
+It waits briefly for Google Drive and reports which shared artifacts are still
+missing; override the wait with `--wait SECONDS` when needed.
 
 Use `/usr/bin/python3 "${runtime_scripts}/codex-migrate-memories"` only when
 the user authorizes durable migration. It verifies the entire memory Git

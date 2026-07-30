@@ -21,7 +21,7 @@ from .model import (
     required_string,
 )
 from .receipt_server import serve_receipts, submit_receipts
-from .slack_threads import classify_slack_pages
+from .slack_threads import classify_slack_activity, classify_slack_pages
 from .source import (
     claim,
     ingest,
@@ -71,6 +71,7 @@ def _parser() -> argparse.ArgumentParser:
         "heartbeat",
         "serve-receipts",
         "submit-batch",
+        "slack-activity",
         "slack-events",
     ):
         _ = commands.add_parser(name)
@@ -114,6 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     command = cast(str, args.command)
     if command == "classify-ci":
         print(compact_json(asdict(classify_ci_jobs(_input()))))
+        return 0
+    if command == "slack-activity":
+        print(compact_json(classify_slack_activity(_input())))
         return 0
     if command == "slack-events":
         print(compact_json(classify_slack_pages(_input())))

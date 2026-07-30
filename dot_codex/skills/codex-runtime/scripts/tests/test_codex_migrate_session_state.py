@@ -11,6 +11,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 from typing import Callable, Protocol, cast
 import unittest
 from unittest.mock import patch
@@ -38,7 +39,9 @@ class Migrator(Protocol):
 
     def link_path(self, source: Path, target: Path) -> dict[str, object]: ...
 
-    def link(self, codex_home: Path, shared_root: Path) -> dict[str, object]: ...
+    def link(
+        self, codex_home: Path, shared_root: Path, *, wait_seconds: float = 30
+    ) -> dict[str, object]: ...
 
 
 migrator = cast(Migrator, cast(object, module))
@@ -72,10 +75,14 @@ class SessionMigrationTests(unittest.TestCase):
         _ = child.write_text('{"type":"session_meta"}\ncontent\n', encoding="utf-8")
         return source, target, child
 
-    def test_existing_subset_is_removed_after_atomic_directory_exchange(self) -> None:
+    def test_provider_owned_destination_root_survives_directory_reconciliation(
+        self,
+    ) -> None:
         source, target, child = self.create_directory("rotated_rollout_segments")
         _ = shutil.copytree(source, target)
-        inode = source.stat().st_ino
+        inode = target.stat().st_ino
+        provider_file = target / "thread" / "segment" / "rollout.jsonl"
+        provider_file_inode = provider_file.stat().st_ino
 
         result = migrator.migrate_path(source, target, dry_run=False)
 
@@ -84,6 +91,7 @@ class SessionMigrationTests(unittest.TestCase):
         self.assertTrue(source.is_symlink())
         self.assertEqual(source.resolve(), target.resolve())
         self.assertEqual(target.stat().st_ino, inode)
+        self.assertEqual(provider_file.stat().st_ino, provider_file_inode)
         self.assertEqual(
             child.read_text(encoding="utf-8"), '{"type":"session_meta"}\ncontent\n'
         )
@@ -95,7 +103,8 @@ class SessionMigrationTests(unittest.TestCase):
         source = self.codex_home / "session_index.jsonl"
         target = self.shared_root / source.name
         _ = source.write_text("session\n", encoding="utf-8")
-        inode = source.stat().st_ino
+        _ = target.write_text("session\n", encoding="utf-8")
+        inode = target.stat().st_ino
 
         result = migrator.migrate_path(source, target, dry_run=False)
 
@@ -103,6 +112,35 @@ class SessionMigrationTests(unittest.TestCase):
         self.assertTrue(source.is_symlink())
         self.assertEqual(target.stat().st_ino, inode)
         self.assertEqual(source.read_text(encoding="utf-8"), "session\n")
+
+    def test_stale_provider_session_index_receives_missing_records_in_place(
+        self,
+    ) -> None:
+        source = self.codex_home / "session_index.jsonl"
+        target = self.shared_root / source.name
+        _ = source.write_text('{"id":1}\n{"id":2}\n', encoding="utf-8")
+        _ = target.write_text('{"id":1}\n', encoding="utf-8")
+        inode = target.stat().st_ino
+
+        _ = migrator.migrate_path(source, target, dry_run=False)
+
+        self.assertEqual(target.stat().st_ino, inode)
+        self.assertEqual(target.read_text(), '{"id":1}\n{"id":2}\n')
+        self.assertTrue(source.is_symlink())
+
+    def test_divergent_provider_session_index_is_never_replaced(self) -> None:
+        source = self.codex_home / "session_index.jsonl"
+        target = self.shared_root / source.name
+        _ = source.write_text('{"id":1}\n{"id":2}\n', encoding="utf-8")
+        _ = target.write_text('{"id":3}\n', encoding="utf-8")
+        inode = target.stat().st_ino
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            _ = migrator.migrate_path(source, target, dry_run=False)
+
+        self.assertFalse(source.is_symlink())
+        self.assertEqual(target.stat().st_ino, inode)
+        self.assertEqual(target.read_text(), '{"id":3}\n')
 
     def test_repeat_migration_is_idempotent(self) -> None:
         source, target, _ = self.create_directory("attachments")
@@ -195,6 +233,28 @@ class SessionMigrationTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_late_real_file_is_never_deleted_during_link_shell_cleanup(self) -> None:
+        source, target, _ = self.create_directory("rotated_rollout_segments")
+        target.mkdir()
+        original_rmdir = Path.rmdir
+        injected = False
+
+        def inject_file(path: Path) -> None:
+            nonlocal injected
+            if path.name == ".rotated_rollout_segments.migration-link" and not injected:
+                injected = True
+                _ = (path / "late-rollout.jsonl").write_text("must survive\n")
+            original_rmdir(path)
+
+        with patch.object(Path, "rmdir", autospec=True, side_effect=inject_file):
+            with self.assertRaises(OSError):
+                _ = migrator.migrate_path(source, target, dry_run=False)
+
+        self.assertFalse(source.is_symlink())
+        self.assertEqual((source / "late-rollout.jsonl").read_text(), "must survive\n")
+        self.assertTrue((source / "thread").is_symlink())
+        self.assertTrue((target / "thread" / "segment" / "rollout.jsonl").is_file())
+
     def test_all_session_state_paths_are_migrated(self) -> None:
         for name in ("rotated_rollout_segments", "archived_sessions", "attachments"):
             _ = self.create_directory(name)
@@ -224,9 +284,13 @@ class SessionMigrationTests(unittest.TestCase):
         self.assertFalse(source.is_symlink())
         self.assertFalse((self.shared_root / "rotated_rollout_segments").exists())
 
-    def test_changed_subset_after_exchange_rolls_back_without_deleting_it(self) -> None:
+    def test_changed_provider_file_rolls_back_without_replacing_its_identity(
+        self,
+    ) -> None:
         source, target, _ = self.create_directory("rotated_rollout_segments")
         _ = shutil.copytree(source, target)
+        provider_file = target / "thread" / "segment" / "rollout.jsonl"
+        provider_inode = provider_file.stat().st_ino
         original_exchange = cast(
             Callable[[Path, Path], None], module.__dict__["_exchange"]
         )
@@ -237,9 +301,7 @@ class SessionMigrationTests(unittest.TestCase):
             original_exchange(left, right)
             if not changed:
                 changed = True
-                _ = (right / "thread" / "segment" / "rollout.jsonl").write_text(
-                    '{"type":"session_meta"}\nchanged\n'
-                )
+                _ = provider_file.write_text('{"type":"session_meta"}\nchanged\n')
 
         with patch.object(module, "_exchange", side_effect=mutate_after_exchange):
             with self.assertRaisesRegex(ValueError, "differs"):
@@ -249,8 +311,35 @@ class SessionMigrationTests(unittest.TestCase):
         self.assertTrue(target.is_dir())
         self.assertEqual(
             (target / "thread" / "segment" / "rollout.jsonl").read_text(),
-            '{"type":"session_meta"}\ncontent\n',
+            '{"type":"session_meta"}\nchanged\n',
         )
+        self.assertEqual(provider_file.stat().st_ino, provider_inode)
+
+    def test_new_destination_root_is_never_replaced(self) -> None:
+        source, target, child = self.create_directory("archived_sessions")
+
+        _ = migrator.migrate_path(source, target, dry_run=False)
+
+        self.assertTrue(source.is_symlink())
+        self.assertEqual(source.resolve(), target.resolve())
+        self.assertEqual(
+            child.read_text(encoding="utf-8"), '{"type":"session_meta"}\ncontent\n'
+        )
+
+    def test_nonidentical_provider_contents_prevent_any_reconciliation(self) -> None:
+        source, target, child = self.create_directory("rotated_rollout_segments")
+        _ = shutil.copytree(source, target)
+        provider_inode = target.stat().st_ino
+        _ = (target / "thread" / "segment" / "rollout.jsonl").write_text(
+            '{"type":"session_meta"}\nchanged\n'
+        )
+
+        with self.assertRaisesRegex(ValueError, "differs"):
+            _ = migrator.migrate_path(source, target, dry_run=False)
+
+        self.assertFalse(source.is_symlink())
+        self.assertTrue(child.is_file())
+        self.assertEqual(target.stat().st_ino, provider_inode)
 
     def test_follower_links_absent_session_directory(self) -> None:
         target = self.shared_root / "rotated_rollout_segments"
@@ -360,6 +449,41 @@ class SessionMigrationTests(unittest.TestCase):
             self.assertEqual(
                 (self.codex_home / name).resolve(), (self.shared_root / name).resolve()
             )
+
+    def test_follower_reports_google_drive_sync_delay_without_touching_local_state(
+        self,
+    ) -> None:
+        source = self.codex_home / "rotated_rollout_segments"
+        source.mkdir()
+
+        with self.assertRaisesRegex(
+            FileNotFoundError,
+            "Google Drive has not synchronized.*rotated_rollout_segments",
+        ):
+            _ = migrator.link(self.codex_home, self.shared_root, wait_seconds=0)
+
+        self.assertTrue(source.is_dir())
+        self.assertFalse(source.is_symlink())
+
+    def test_follower_waits_for_google_drive_to_expose_shared_state(self) -> None:
+        def finish_sync() -> None:
+            time.sleep(0.01)
+            for name in (
+                "rotated_rollout_segments",
+                "archived_sessions",
+                "attachments",
+            ):
+                (self.shared_root / name).mkdir()
+            _ = (self.shared_root / "session_index.jsonl").write_text("index\n")
+
+        sync = threading.Thread(target=finish_sync)
+        sync.start()
+        try:
+            result = migrator.link(self.codex_home, self.shared_root, wait_seconds=2)
+        finally:
+            sync.join()
+
+        self.assertEqual(result["status"], "linked")
 
 
 if __name__ == "__main__":

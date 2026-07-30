@@ -96,6 +96,11 @@ Immediately before publication, reverify the actual head, request, ownership,
 and existing terminal review. Publish any required replies before submitting
 the final verdict: some providers implicitly create a neutral review when a
 thread reply is posted, replacing the principal's latest approval. Submit one
-final verdict for that exact cycle, verify the first-party latest review state
-as well as the review and inline receipts, and resolve the watcher claim only
-after the terminal publication receipt exists.
+final verdict for that exact cycle. A neutral comment does not clear the
+principal's earlier change-request disposition. When a later assessment finds
+no remaining severe blocker, dismiss only the principal's superseded
+change-request reviews, retain the substantive findings, and verify that the
+aggregate pull-request disposition is no longer blocked by those reviews.
+Never dismiss another reviewer's findings. Verify the first-party latest
+review state and inline receipts, then resolve the watcher claim only after
+the terminal publication receipt exists.

@@ -12,6 +12,8 @@ from pathlib import Path
 import runpy
 import shutil
 import socket
+import sys
+import time
 from typing import Callable, cast
 
 
@@ -38,10 +40,23 @@ def _verify_file(source: Path, target: Path) -> int:
     return size
 
 
+def _session_index_suffix(source: Path, target: Path) -> bytes:
+    if target.is_symlink() or not target.is_file() or not source.is_file():
+        raise ValueError("shared session index is absent from the local store")
+    local = source.read_bytes()
+    shared = target.read_bytes()
+    if not local.startswith(shared) or (shared and not shared.endswith(b"\n")):
+        raise ValueError("shared session index conflicts with local history")
+    return local[len(shared) :]
+
+
 def _verify_subset(source: Path, target: Path) -> tuple[int, int]:
     if not target.exists():
         return 0, 0
     if source.is_file():
+        if source.name == "session_index.jsonl":
+            _ = _session_index_suffix(source, target)
+            return 1, target.stat().st_size
         return 1, _verify_file(source, target)
     if target.is_symlink() or not target.is_dir():
         raise ValueError("shared session store is not a real directory: " + str(target))
@@ -81,6 +96,100 @@ def _require_leader(shared_root: Path) -> None:
         )
 
 
+def _discard_reconciled(path: Path, target: Path) -> None:
+    if path.is_file():
+        _ = _verify_file(path, target)
+        path.unlink()
+        return
+    children = tuple(path.iterdir())
+    for child in children:
+        destination = target / child.name
+        if not child.is_symlink() or not destination.exists():
+            raise RuntimeError("local session store changed during migration")
+        if child.resolve() != destination.resolve():
+            raise RuntimeError("local session store changed during migration")
+    removed: list[tuple[Path, Path]] = []
+    try:
+        for child in children:
+            destination = target / child.name
+            child.unlink()
+            removed.append((child, destination))
+        path.rmdir()
+    except BaseException:
+        for child, destination in removed:
+            os.symlink(destination, child, target_is_directory=destination.is_dir())
+        raise
+
+
+def _link_reconciled(source: Path, target: Path) -> None:
+    temporary = source.parent / ("." + source.name + ".migration-link")
+    if temporary.exists() or temporary.is_symlink():
+        raise ValueError("previous migration link already exists: " + str(temporary))
+    exchanged = False
+    try:
+        os.symlink(target, temporary, target_is_directory=target.is_dir())
+        _sync_directory(source.parent)
+        _exchange(source, temporary)
+        exchanged = True
+        _sync_directory(source.parent)
+        if not source.is_symlink() or source.resolve() != target.resolve():
+            raise RuntimeError("atomic migration did not retain the local session path")
+        _discard_reconciled(temporary, target)
+    except BaseException:
+        if exchanged:
+            _exchange(source, temporary)
+        if temporary.is_symlink():
+            temporary.unlink()
+        _sync_directory(source.parent)
+        raise
+    _sync_directory(source.parent)
+
+
+def _publish_missing(source: Path, target: Path) -> None:
+    if target.exists() or target.is_symlink():
+        raise FileExistsError("shared session item already exists: " + str(target))
+    inode = source.stat().st_ino
+    exchanged = False
+    try:
+        os.symlink(target, target, target_is_directory=source.is_dir())
+        _sync_directory(target.parent)
+        _exchange(source, target)
+        exchanged = True
+        _sync_directory(source.parent)
+        _sync_directory(target.parent)
+        if not source.is_symlink() or source.resolve() != target.resolve():
+            raise RuntimeError("atomic item migration did not retain its local path")
+        if target.stat().st_ino != inode:
+            raise RuntimeError("atomic item migration did not retain its source inode")
+    except BaseException:
+        if exchanged:
+            _exchange(source, target)
+        if target.is_symlink():
+            target.unlink()
+        _sync_directory(source.parent)
+        _sync_directory(target.parent)
+        raise
+
+
+def _merge_directory(source: Path, target: Path) -> None:
+    for original in tuple(source.iterdir()):
+        shared = target / original.name
+        if original.is_symlink():
+            if not shared.exists() or original.resolve() != shared.resolve():
+                raise ValueError("local session item points to another destination")
+            continue
+        if not shared.exists():
+            _publish_missing(original, shared)
+        elif original.is_dir() and shared.is_dir() and not shared.is_symlink():
+            _merge_directory(original, shared)
+            _link_reconciled(original, shared)
+        elif original.is_file():
+            _ = _verify_file(original, shared)
+            _link_reconciled(original, shared)
+        else:
+            raise ValueError("shared session item conflicts with the local store")
+
+
 def migrate_path(source: Path, target: Path, *, dry_run: bool) -> dict[str, object]:
     if source.is_symlink():
         if not target.exists() or source.resolve() != target.resolve():
@@ -99,48 +208,35 @@ def migrate_path(source: Path, target: Path, *, dry_run: bool) -> dict[str, obje
             "duplicate_bytes": size,
         }
 
-    previous = target.parent / ("." + target.name + ".pre-migration")
-    if previous.exists() or previous.is_symlink():
-        raise ValueError("previous migration backup already exists: " + str(previous))
-    original_inode = source.stat().st_ino
-    moved_previous = False
-    exchanged = False
-    try:
-        if target.exists():
-            _ = target.rename(previous)
-            moved_previous = True
+    if source.is_dir():
+        # Drive associates cloud folders with their inode; replacing this root trashes it.
+        if not target.exists():
+            target.mkdir(mode=0o700)
             _sync_directory(target.parent)
-        os.symlink(target, target)
-        _sync_directory(target.parent)
-        _exchange(source, target)
-        exchanged = True
-        _sync_directory(source.parent)
-        _sync_directory(target.parent)
-        if not source.is_symlink() or source.resolve() != target.resolve():
-            raise RuntimeError("atomic migration did not retain the local session path")
-        if target.stat().st_ino != original_inode:
-            raise RuntimeError(
-                "atomic migration did not retain the original session directory"
-            )
-        if moved_previous:
-            _ = _verify_subset(target, previous)
-    except BaseException:
-        if exchanged:
-            _exchange(source, target)
-        if target.is_symlink():
-            target.unlink(missing_ok=True)
-        if moved_previous and previous.exists() and not target.exists():
-            _ = previous.rename(target)
-        _sync_directory(source.parent)
-        _sync_directory(target.parent)
-        raise
-
-    if moved_previous:
-        if previous.is_dir():
-            shutil.rmtree(previous)
-        else:
-            previous.unlink()
-        _sync_directory(target.parent)
+        if not target.is_dir() or target.is_symlink():
+            raise ValueError("shared session store is not a real directory")
+        target_inode = target.stat().st_ino
+        _merge_directory(source, target)
+    else:
+        if not target.exists():
+            with source.open("rb") as original, target.open("xb") as shared:
+                shutil.copyfileobj(original, shared)
+                shared.flush()
+                os.fsync(shared.fileno())
+            _sync_directory(target.parent)
+        elif source.name == "session_index.jsonl":
+            suffix = _session_index_suffix(source, target)
+            if suffix:
+                with target.open("ab") as shared:
+                    _ = shared.write(suffix)
+                    shared.flush()
+                    os.fsync(shared.fileno())
+                _sync_directory(target.parent)
+        target_inode = target.stat().st_ino
+        _ = _verify_file(source, target)
+    _link_reconciled(source, target)
+    if target.stat().st_ino != target_inode:
+        raise RuntimeError("provider-owned shared session identity changed")
     return {
         "directory": source.name,
         "status": "migrated",
@@ -186,7 +282,34 @@ def link_path(source: Path, target: Path) -> dict[str, object]:
     return {"directory": source.name, "status": "linked"}
 
 
-def link(codex_home: Path, shared_root: Path) -> dict[str, object]:
+def _wait_for_shared_state(shared_root: Path, seconds: float) -> None:
+    deadline = time.monotonic() + seconds
+    announced = False
+    while True:
+        missing = [name for name in SESSION_STATE if not (shared_root / name).exists()]
+        if not missing:
+            return
+        if time.monotonic() >= deadline:
+            raise FileNotFoundError(
+                "Google Drive has not synchronized the leader's session state: "
+                + ", ".join(missing)
+                + ". Wait for Google Drive to finish syncing, then retry."
+            )
+        if not announced:
+            print(
+                "Waiting for Google Drive to synchronize session state: "
+                + ", ".join(missing),
+                file=sys.stderr,
+                flush=True,
+            )
+            announced = True
+        time.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
+
+
+def link(
+    codex_home: Path, shared_root: Path, *, wait_seconds: float = 30
+) -> dict[str, object]:
+    _wait_for_shared_state(shared_root, wait_seconds)
     return {
         "status": "linked",
         "directories": [
@@ -200,14 +323,19 @@ def main(argv: Sequence[str] = ()) -> int:
     modes = parser.add_mutually_exclusive_group()
     _ = modes.add_argument("--dry-run", action="store_true")
     _ = modes.add_argument("--link", action="store_true")
+    _ = parser.add_argument("--wait", type=float, default=30)
     arguments = parser.parse_args(argv or None)
     codex_home = Path.home() / ".codex"
     shared_root = (codex_home / "sessions").resolve().parent
-    result = (
-        link(codex_home, shared_root)
-        if cast(bool, arguments.link)
-        else migrate(codex_home, shared_root, dry_run=cast(bool, arguments.dry_run))
-    )
+    try:
+        result = (
+            link(codex_home, shared_root, wait_seconds=cast(float, arguments.wait))
+            if cast(bool, arguments.link)
+            else migrate(codex_home, shared_root, dry_run=cast(bool, arguments.dry_run))
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        print("Codex session setup failed: " + str(error), file=sys.stderr)
+        return 1
     print(json.dumps(result))
     return 0
 

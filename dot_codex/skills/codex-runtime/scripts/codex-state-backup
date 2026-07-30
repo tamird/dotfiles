@@ -24,6 +24,8 @@ LABEL = "local.codex.state-backup"
 LARGE_DATABASE_BYTES = 64 * 1024 * 1024
 LARGE_DATABASE_INTERVAL_SECONDS = 3600
 SMALL_DATABASE_INTERVAL_SECONDS = 300
+NOTIFICATION_DATABASE_INTERVAL_SECONDS = 24 * 60 * 60
+NOTIFICATION_TABLES = ("sources", "notifications", "claims", "receipts", "metadata")
 
 
 @dataclass(frozen=True)
@@ -108,7 +110,7 @@ def database_sources(configuration: Configuration) -> List[Source]:
         ),
         Source(
             "notifications",
-            configuration.destination / "review-monitor" / "notifications.sqlite3",
+            root.parent / ".cache" / "codex" / "review-monitor" / "notifications.sqlite3",
             destination / "notifications.sqlite",
         ),
     ]
@@ -231,11 +233,12 @@ def backup_database(
 
     moment = time.time() if now is None else now
     source_size = source.source.stat().st_size
-    interval = (
-        configuration.large_database_interval
-        if source_size >= configuration.large_database_bytes
-        else configuration.small_database_interval
-    )
+    if source.name == "notifications":
+        interval = NOTIFICATION_DATABASE_INTERVAL_SECONDS
+    elif source_size >= configuration.large_database_bytes:
+        interval = configuration.large_database_interval
+    else:
+        interval = configuration.small_database_interval
     if source.destination.is_file():
         destination_stat = source.destination.stat()
         if _source_modified_at(source.source) <= destination_stat.st_mtime_ns:
@@ -398,6 +401,96 @@ def _has_open_database_handles(path: Path) -> bool:
     if result.returncode == 1 and not result.stderr.strip():
         return False
     raise RuntimeError("could not establish whether the state database is open")
+
+
+def _has_open_path(path: Path) -> bool:
+    if not path.exists():
+        return False
+    result = subprocess.run(
+        ["/usr/sbin/lsof", "-t", "--", str(path)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.stdout.strip():
+        return True
+    if result.returncode == 1 and not result.stderr.strip():
+        return False
+    raise RuntimeError("could not establish whether a notification path is open")
+
+
+def _notification_counts(
+    path: Path, *, verify_integrity: bool = False
+) -> Dict[str, int]:
+    source_uri = "file:" + quote(str(path), safe="/") + "?mode=ro&immutable=1"
+    with sqlite3.connect(source_uri, uri=True, timeout=5) as database:
+        if database.execute("PRAGMA journal_mode").fetchone() != ("delete",):
+            raise ValueError("notification database is not a standalone snapshot")
+        counts: Dict[str, int] = {}
+        for table in NOTIFICATION_TABLES:
+            result = database.execute("SELECT COUNT(*) FROM " + table).fetchone()
+            if result is None or not isinstance(result[0], int):
+                raise ValueError("notification table count is invalid")
+            counts[table] = result[0]
+        if (
+            verify_integrity
+            and database.execute("PRAGMA quick_check").fetchone() != ("ok",)
+        ):
+            raise ValueError("notification database failed its integrity check")
+    return counts
+
+
+def migrate_notifications(configuration: Configuration) -> Dict[str, Any]:
+    _require_leader(configuration)
+    notification = next(
+        source
+        for source in database_sources(configuration)
+        if source.name == "notifications"
+    )
+    shared = configuration.destination / "review-monitor" / "notifications.sqlite3"
+    shared_socket = shared.with_name("notification-receipts.sock")
+    local = notification.source
+
+    if not shared.is_file():
+        if local.is_file():
+            return {"status": "already_migrated", "database": str(local)}
+        raise FileNotFoundError("shared notification database does not exist")
+    if _has_open_database_handles(shared) or _has_open_path(shared_socket):
+        raise PermissionError("stop the notification operator before migrating its database")
+    if any(
+        candidate.exists()
+        for candidate in (Path(str(shared) + "-wal"), Path(str(shared) + "-shm"))
+    ):
+        raise ValueError("shared notification database has uncheckpointed sidecars")
+
+    expected = _notification_counts(shared, verify_integrity=True)
+    if local.exists():
+        raise FileExistsError("local notification database already exists")
+    _backup_sqlite(shared, local, read_only_source=True)
+    if _notification_counts(local, verify_integrity=True) != expected:
+        raise ValueError("copied notification database does not match shared state")
+
+    if _has_open_database_handles(shared) or _has_open_path(shared_socket):
+        raise PermissionError("notification operator restarted during migration")
+    if _notification_counts(shared) != expected:
+        raise ValueError("shared notification state changed during migration")
+    if _notification_counts(local) != expected:
+        raise ValueError("local notification state changed during migration")
+
+    notification.destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for suffix in ("-wal", "-shm", "-journal"):
+        Path(str(notification.destination) + suffix).unlink(missing_ok=True)
+    os.chmod(shared, 0o600)
+    os.replace(shared, notification.destination)
+    if shared_socket.exists():
+        shared_socket.unlink()
+    return {
+        "status": "migrated",
+        "database": str(local),
+        "socket": str(local.with_name("notification-receipts.sock")),
+        "rows": expected,
+    }
 
 
 def restore_missing(
@@ -620,6 +713,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     election.add_argument("--leader", action="store_true", required=True)
     election.add_argument("--takeover", action="store_true")
     commands.add_parser("stop", help="stop the local backup writer")
+    commands.add_parser(
+        "migrate-notifications", help="move inactive notification state to local cache"
+    )
     install_parser = commands.add_parser(
         "install", help="install a leader writer or disable a follower writer"
     )
@@ -646,6 +742,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     elif args.command == "stop":
         result = stop()
         result["status"] = "stopped"
+    elif args.command == "migrate-notifications":
+        result = migrate_notifications(configuration)
     elif args.command == "restore":
         result = restore_missing(configuration, repair_empty=args.repair_empty)
     elif args.command == "install":

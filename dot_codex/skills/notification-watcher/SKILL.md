@@ -10,6 +10,10 @@ user tasks, authored-change feedback, and continuous-integration updates.
 Notification intake does not authorize implementing a request, posting a
 message, reviewing code, changing provider state, or starting another scanner.
 
+Keep the live notification SQLite database and its receipt socket in machine-local
+cache, never in cloud-synchronized storage. Only the elected backup leader may
+run the receipt writer; publish consistent, throttled snapshots for followers.
+
 Read the private operator profile and notification source checklist only when
 provider identity, authority, monitored subjects, source ownership, or routing
 matters. Keep provider adapters, company-specific information, credentials,
@@ -42,6 +46,13 @@ databases, and live cursors outside this public skill.
   actual checkpoint overlap and include discovery and every required root in
   authenticated `required_scopes` and `observed_scopes`; an incomplete scope
   must prevent a complete observation or checkpoint advance.
+- Discover watched-channel activity with one fully paginated provider-native
+  search across authorized channels when available. Replay beyond both the
+  actual outage and plausible indexing delay; hydrate every changed or new
+  root, protect unresolved and user-designated roots, and rotate bounded full
+  reconciliation of dormant roots. Preserve each root's actual last terminal
+  observation. Never mark an unscanned root observed or rely on channel search
+  to cover direct messages.
 - Classify review requests, control-plane tasks, owned-change feedback, and CI
   transitions separately. Leave human review authority to the downstream
   review consumer; a bot, changed head, mention, announcement, or failed
@@ -108,7 +119,8 @@ Run the watcher without installing dependencies or creating an environment:
 
 ```sh
 PYTHONPATH="$HOME/.codex/skills/notification-watcher/scripts/src" \
-  python3 -B -m codex_notification_watcher health --limit 12
+  python3 -B -m codex_notification_watcher \
+    --database /path/to/existing-notifications.sqlite3 health --limit 12
 ```
 
 Resume each source from its actual verified high-water mark. Use an explicit

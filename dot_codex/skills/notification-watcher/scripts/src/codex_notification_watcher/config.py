@@ -13,16 +13,17 @@ DEFAULT_MAXIMUM_SOURCE_AGE_SECONDS = 120
 
 
 def require_writer_leadership(database: Path) -> None:
-    """Permit shared notification writes only on the elected machine."""
-    runtime = (
-        Path.home() / "Google Drive" / "My Drive" / "Codex" / "runtime"
-    ).resolve()
-    if not database.resolve().is_relative_to(runtime):
+    """Permit canonical notification writes only on the elected machine."""
+    home = Path.home()
+    runtime = (home / "Google Drive" / "My Drive" / "Codex" / "runtime").resolve()
+    local = (home / ".cache" / "codex" / "review-monitor").resolve()
+    location = database.resolve()
+    if not location.is_relative_to(runtime) and not location.is_relative_to(local):
         return
 
     marker = runtime / "backup-leader.json"
     if not marker.is_file() or marker.is_symlink():
-        raise PermissionError("shared notification writer has no elected leader")
+        raise PermissionError("notification writer has no elected leader")
     with marker.open(encoding="utf-8") as source:
         value: object = json.load(source)
     if not isinstance(value, dict):
@@ -32,7 +33,7 @@ def require_writer_leadership(database: Path) -> None:
         raise ValueError("shared notification leader record is invalid")
     if leader != socket.gethostname():
         raise PermissionError(
-            "shared notification state can only be written by its elected leader"
+            "notification state can only be written by its elected leader"
         )
 
 
@@ -50,10 +51,8 @@ class RuntimeConfig:
             Path(configured).expanduser()
             if configured
             else Path.home()
-            / "Google Drive"
-            / "My Drive"
-            / "Codex"
-            / "runtime"
+            / ".cache"
+            / "codex"
             / "review-monitor"
             / "notifications.sqlite3"
         )

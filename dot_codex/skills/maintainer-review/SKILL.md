@@ -78,6 +78,9 @@ incident or initiative.
 Apply `$change-record-writing` to the actual title and rendered cumulative
 description, including its pull-request title-length limit, causal reason,
 primary citations, platform rationale, and the repository's real formatting.
+Literal code fences and short clarifying bullet lists are legitimate; flag a
+long inventory for its unnecessary scope or missing narrative, not merely
+because it uses Markdown.
 Never invent an author's rationale or edit another person's record without
 explicit authorization.
 
@@ -101,7 +104,10 @@ approve only when no relevant findings remain.
 
 CI owns failed-check gating: do not request changes merely because a check is
 red, pending, or unrelated. When sound code has only a deficient description,
-leave a neutral finding; neither approve nor request changes. Verify the
+leave a neutral finding; neither approve nor request changes. If an earlier
+change request from the principal is now superseded because no severe finding
+remains, clear that principal-owned request rather than leaving a neutral
+comment while the pull request remains blocked. Verify the
 repository's actual owner scope, draft policy, neutral-only requirements,
 and explicitly authorized delegated attribution; do not claim an approval
 satisfies another owner's gate. Publish only when authorized, reverify the
