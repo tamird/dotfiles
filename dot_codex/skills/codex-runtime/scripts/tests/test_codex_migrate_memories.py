@@ -29,7 +29,7 @@ class MigrationModule(Protocol):
     Path: type[Path]
 
     def fingerprint(
-        self, root: Path
+        self, root: Path, *, exclude: Union[frozenset[str], None] = None
     ) -> tuple[dict[str, tuple[str, str, int, int]], int]: ...
 
     def migrate(
@@ -50,10 +50,6 @@ class MigrationModule(Protocol):
         *,
         swap: Callable[[Path, Path], None] = ...,
     ) -> dict[str, Union[str, int]]: ...
-
-    def _working_entries(
-        self, root: Path
-    ) -> dict[str, tuple[str, str, int, int]]: ...
 
     def _stop_duplicate_fsmonitor(self, directory: Path, worktree: Path) -> None: ...
 
@@ -233,7 +229,7 @@ class RecoverRestoredMemoriesTests(unittest.TestCase):
 
     def __init__(self, methodName: str = "runTest") -> None:
         super().__init__(methodName)
-        directory = tempfile.TemporaryDirectory()
+        directory = tempfile.TemporaryDirectory(dir="/tmp")
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         self.destination = self.root / "shared" / "memories"
@@ -362,7 +358,9 @@ class RecoverRestoredMemoriesTests(unittest.TestCase):
         path = self.destination / ".git (1)" / "fsmonitor--daemon-common-v1.ipc"
         with socket.socket(socket.AF_UNIX) as monitor:
             monitor.bind(str(path))
-            entries = migration._working_entries(self.destination)
+            entries, _ = migration.fingerprint(
+                self.destination, exclude=frozenset({".git", ".git (1)"})
+            )
 
         self.assertIn("MEMORY.md", entries)
         self.assertFalse(any(name.startswith(".git") for name in entries))
@@ -378,7 +376,9 @@ class RecoverRestoredMemoriesTests(unittest.TestCase):
                 return ""
 
             with patch.object(module, "_git", side_effect=stop) as git:
-                migration._stop_duplicate_fsmonitor(duplicate, self.destination)
+                migration._stop_duplicate_fsmonitor(  # pyright: ignore[reportPrivateUsage]
+                    duplicate, self.destination
+                )
 
         git.assert_called_once_with(
             duplicate,

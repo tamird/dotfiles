@@ -25,7 +25,7 @@ Fingerprint = dict[str, tuple[str, str, int, int]]
 
 
 def fingerprint(
-    root: Path, *, exclude: frozenset[str] = frozenset()
+    root: Path, *, exclude: Union[frozenset[str], None] = None
 ) -> tuple[Fingerprint, int]:
     """Record every directory, regular file, and preserved symlink once."""
     if root.is_symlink() or not root.is_dir():
@@ -35,7 +35,7 @@ def fingerprint(
     total = 0
     for parent, directories, files in os.walk(root, followlinks=False):
         current = Path(parent)
-        if current == root:
+        if current == root and exclude is not None:
             directories[:] = [name for name in directories if name not in exclude]
             files = [name for name in files if name not in exclude]
         for name in sorted(directories + files):
