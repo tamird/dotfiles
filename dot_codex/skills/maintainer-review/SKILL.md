@@ -92,6 +92,13 @@ independent source defect inline; use one concise overall comment for
 cross-cutting design, prose, or unanchorable evidence. Batch repetition and
 reply in the existing discussion.
 
+Reserve a request-changes verdict for a genuinely severe, evidenced finding,
+such as an exploitable security boundary, data loss, a production outage, or
+a comparably serious correctness failure. A defect's label, author, volume,
+or hypothetical severity is not enough. Leave ordinary correctness,
+maintainability, testing, and documentation findings as neutral comments;
+approve only when no relevant findings remain.
+
 CI owns failed-check gating: do not request changes merely because a check is
 red, pending, or unrelated. When sound code has only a deficient description,
 leave a neutral finding; neither approve nor request changes. Verify the

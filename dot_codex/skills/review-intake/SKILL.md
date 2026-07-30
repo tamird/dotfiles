@@ -76,6 +76,9 @@ warrants it.
 Use `$maintainer-review` for findings, inline placement, change records,
 CI, and the appropriate substantive verdict.
 
+Request changes only when that review establishes a genuinely severe
+blocking finding. Publish lesser findings as neutral comments instead.
+
 Apply repository-specific verdict, signature, reviewer-gate, mirrored-change,
 and reaction policy from the private operator profile. Do not imply that an
 approval satisfies an outstanding owner gate. An explicit request to publish
