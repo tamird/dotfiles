@@ -77,6 +77,12 @@ enabled = true
 [plugins."notebook@openai-bundled"]
 enabled = true
 
+[plugins."chrome-internal@openai-bundled"]
+enabled = true
+
+[plugins."computer-history@openai-bundled"]
+enabled = true
+
 [projects."/Users/tamird/code/openai/mia"]
 trust_level = "trusted"
 
@@ -332,15 +338,23 @@ trust_level = "trusted"
 [projects."/Users/tamird/Documents/Codex/2026-07-19/sc"]
 trust_level = "trusted"
 
+[projects."/Users/tamird/Documents/Codex/2026-07-22/chrome-internal-plugin-chrome-internal-openai"]
+trust_level = "trusted"
+
 [marketplaces.openai-primary-runtime]
-last_updated = "2026-07-16T19:15:48Z"
+last_updated = "2026-07-24T08:14:19Z"
 source_type = "local"
 source = "/Users/tamird/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
 
 [marketplaces.openai-bundled]
-last_updated = "2026-07-22T14:08:34Z"
+last_updated = "2026-07-24T20:12:14Z"
 source_type = "local"
 source = "/Users/tamird/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-internal-testing]
+last_updated = "2026-07-27T09:07:58Z"
+source_type = "local"
+source = "/Users/tamird/.codex/.tmp/marketplaces/openai-internal-testing"
 
 [memories]
 generate_memories = true
@@ -364,6 +378,8 @@ resume_cwd = "current"
 
 [tui.model_availability_nux]
 "gpt-5.5" = 1
+mewthree = 4
+mewtwo = 1
 
 [apps.asdk_app_69a1d78e929881919bba0dbda1f6436d]
 enabled = true
@@ -380,13 +396,13 @@ NODE_REPL_NODE_PATH = "/Applications/ChatGPT (Alpha).app/Contents/Resources/cua_
 NODE_REPL_TRUSTED_CODE_PATHS = "/Users/tamird/.codex"
 CODEX_HOME = "/Users/tamird/.codex"
 NODE_REPL_TRACE_META = "1"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "5247645b1d6757263c7405db4cac5af3f33c82970cedc5948d784b993be41d7e,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "66d09786fb051bd338c5b80ac1bc5de96f7a450b4df630740210bf7fbd6a6673,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
 BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
 NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
 NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
 NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = "Control desktop apps on macOS through Computer Use."
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "internal-alpha"
-BROWSER_USE_CODEX_APP_VERSION = "26.718.22117"
+BROWSER_USE_CODEX_APP_VERSION = "26.721.40916"
 CODEX_CLI_PATH = "/Applications/ChatGPT (Alpha).app/Contents/Resources/codex"
 
 [mcp_servers.computer-use]
@@ -397,5 +413,5 @@ enabled = false
 
 [shell_environment_policy.set]
 BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "5247645b1d6757263c7405db4cac5af3f33c82970cedc5948d784b993be41d7e,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "66d09786fb051bd338c5b80ac1bc5de96f7a450b4df630740210bf7fbd6a6673,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
 NODE_REPL_TRUSTED_CODE_PATHS = "/Users/tamird/.codex"

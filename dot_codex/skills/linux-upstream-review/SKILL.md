@@ -22,19 +22,14 @@ Before editing:
 Use the base skill's lore fetcher with the narrowest relevant archive. Do not
 substitute GitHub PR metadata for kernel history or lore.
 
-For Rust-for-Linux work on this machine, use the local delivery path instead
-of asking the user for identifiers:
+When an explicitly authorized task requires a configured private mailbox or
+message index, consult `~/Google Drive/My Drive/Codex/runtime/operator-profile.md` for
+the relevant subsystem's inbox, current-series thread, and local reply
+workflow. The private profile neither authorizes mailbox access nor sending.
 
-- Run `rfl-mail inbox` to synchronize the Gmail label, index it with lei, and
-  emit directly addressed, unanswered messages as JSONL.
-- Run `rfl-mail series` to derive the most recently sent cover Message-ID from
-  the current b4 branch and emit that thread as JSONL.
-- Run `lei lcat --no-remote --no-external -f reply id:<msgid>` to produce the
-  reply-all template and quoted context for a selected message.
-
-Treat the template as a draft. Inspect recipients and threading headers,
-render the exact outgoing message, and obtain explicit confirmation before
-sending it through msmtp.
+Treat a generated reply as a draft. Verify its original Message-ID,
+recipients, quoted context, threading headers, and rendered content; obtain
+explicit confirmation before using the user's configured delivery path.
 
 ## Construct kernel commits
 

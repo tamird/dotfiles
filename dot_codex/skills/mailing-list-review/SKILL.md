@@ -1,13 +1,14 @@
 ---
 name: mailing-list-review
-description: Prepare, review, reroll, and respond to email-based patch series using public-inbox archives such as lore. Use when reconstructing prior revisions and replies, reviewing code and permanent prose, maintaining feedback dispositions, preparing a reroll, or inspecting rendered mail. Use a project-specific upstream-review skill instead when one exists; those skills apply this shared base.
+description: Prepare, review, reroll, and respond to email-based patch series using public-inbox archives such as lore. Use when reconstructing prior revisions and replies, reviewing code and permanent prose, maintaining feedback dispositions, preparing a reroll, or inspecting rendered mail. Project-specific upstream-review skills build on this shared base.
 ---
 
 # Mailing List Review
 
 Apply `$maintainer-review`, which also supplies the writing and history bases.
 This skill adds the mailing-list record, feedback, reroll, and delivery
-workflow.
+workflow. Preparing or reviewing a series does not authorize sending mail,
+publishing a branch, contacting maintainers, or claiming review credit.
 
 Own the complete series rather than polishing the latest diff in isolation.
 Reconstruct the discussion, understand the invariant, and make the permanent

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Slack Reviewer Outreach"
-  short_description: "Rank and contact the best reviewer with rationale"
-  default_prompt: "Use $slack-reviewer-outreach to rank suitable reviewers and contact the strongest available candidate."

@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+"""Make bounded, consistent Codex-state backups without copying credentials."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import plistlib
+import re
+import shutil
+import sqlite3
+import subprocess
+import tempfile
+import time
+from typing import Any, Dict, List, Optional, Sequence, cast
+from urllib.parse import quote
+
+
+LABEL = "local.codex.state-backup"
+LARGE_DATABASE_BYTES = 64 * 1024 * 1024
+LARGE_DATABASE_INTERVAL_SECONDS = 3600
+SMALL_DATABASE_INTERVAL_SECONDS = 300
+NETWORK_EVENT = re.compile(r"events\.jsonl(?:\.\d+)?\Z")
+
+
+@dataclass(frozen=True)
+class Configuration:
+    """Explicit local state roots; no recursive source discovery."""
+
+    codex_home: Path
+    destination: Path
+    large_database_bytes: int = LARGE_DATABASE_BYTES
+    large_database_interval: int = LARGE_DATABASE_INTERVAL_SECONDS
+    small_database_interval: int = SMALL_DATABASE_INTERVAL_SECONDS
+
+
+@dataclass(frozen=True)
+class Source:
+    """A single approved source and its exact backup destination."""
+
+    name: str
+    source: Path
+    destination: Path
+
+
+def default_configuration() -> Configuration:
+    home = Path.home()
+    return Configuration(
+        codex_home=home / ".codex",
+        destination=home / "Google Drive" / "My Drive" / "Codex" / "runtime",
+    )
+
+
+def database_sources(configuration: Configuration) -> List[Source]:
+    root = configuration.codex_home
+    destination = configuration.destination / "database-snapshots"
+    return [
+        Source("state", root / "state_5.sqlite", destination / "state.sqlite"),
+        Source("goals", root / "goals_1.sqlite", destination / "goals.sqlite"),
+        Source(
+            "memories", root / "memories_1.sqlite", destination / "memories.sqlite"
+        ),
+    ]
+
+
+def file_sources(configuration: Configuration) -> List[Source]:
+    root = configuration.codex_home
+    destination = configuration.destination
+    review_monitor = destination / "review-monitor"
+    return [
+        Source("history", root / "history.jsonl", destination / "history.jsonl"),
+        Source(
+            "review-watermarks",
+            review_monitor / "watermarks.json",
+            review_monitor / "watermarks.json",
+        ),
+        Source(
+            "review-evidence",
+            review_monitor / "provider-evidence.json",
+            review_monitor / "provider-evidence.json",
+        ),
+        Source(
+            "review-checklist",
+            review_monitor / "checklist.md",
+            review_monitor / "checklist.md",
+        ),
+    ]
+
+
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _temporary_destination(destination: Path) -> Path:
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix="." + destination.name + ".", suffix=".tmp", dir=destination.parent
+    )
+    os.close(descriptor)
+    os.chmod(temporary, 0o600)
+    return Path(temporary)
+
+
+def _atomic_bytes(destination: Path, content: bytes) -> None:
+    temporary = _temporary_destination(destination)
+    try:
+        with temporary.open("wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _source_modified_at(path: Path) -> int:
+    modified = path.stat().st_mtime_ns
+    wal = Path(str(path) + "-wal")
+    if wal.exists():
+        modified = max(modified, wal.stat().st_mtime_ns)
+    return modified
+
+
+def _backup_sqlite(source: Path, destination: Path) -> None:
+    temporary = _temporary_destination(destination)
+    source_uri = "file:" + quote(str(source), safe="/") + "?mode=rw"
+    try:
+        with sqlite3.connect(source_uri, uri=True, timeout=5) as original:
+            original.execute("PRAGMA query_only = ON")
+            with sqlite3.connect(str(temporary), timeout=5) as snapshot:
+                original.backup(snapshot, pages=256, sleep=0.05)
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def backup_database(
+    source: Source, configuration: Configuration, now: Optional[float] = None
+) -> Dict[str, Any]:
+    if not source.source.is_file():
+        return {"name": source.name, "kind": "database", "status": "missing"}
+
+    moment = time.time() if now is None else now
+    source_size = source.source.stat().st_size
+    interval = (
+        configuration.large_database_interval
+        if source_size >= configuration.large_database_bytes
+        else configuration.small_database_interval
+    )
+    if source.destination.is_file():
+        destination_stat = source.destination.stat()
+        if _source_modified_at(source.source) <= destination_stat.st_mtime_ns:
+            return {
+                "name": source.name,
+                "kind": "database",
+                "status": "unchanged",
+            }
+        if moment - destination_stat.st_mtime < interval:
+            return {
+                "name": source.name,
+                "kind": "database",
+                "status": "throttled",
+                "interval_seconds": interval,
+            }
+
+    _backup_sqlite(source.source, source.destination)
+    return {
+        "name": source.name,
+        "kind": "database",
+        "status": "completed",
+        "bytes": source.destination.stat().st_size,
+    }
+
+
+def backup_file(source: Source) -> Dict[str, Any]:
+    if not source.source.is_file() or source.source.is_symlink():
+        return {"name": source.name, "kind": "file", "status": "missing"}
+    original = source.source.stat()
+    if source.destination.is_file():
+        existing = source.destination.stat()
+        if (
+            original.st_size == existing.st_size
+            and original.st_mtime_ns == existing.st_mtime_ns
+        ):
+            return {"name": source.name, "kind": "file", "status": "unchanged"}
+
+    temporary = _temporary_destination(source.destination)
+    try:
+        shutil.copyfile(source.source, temporary)
+        os.chmod(temporary, 0o600)
+        os.utime(temporary, ns=(original.st_atime_ns, original.st_mtime_ns))
+        os.replace(temporary, source.destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return {
+        "name": source.name,
+        "kind": "file",
+        "status": "completed",
+        "bytes": source.destination.stat().st_size,
+    }
+
+
+def network_sources(configuration: Configuration) -> List[Source]:
+    directory = configuration.destination / "network-monitor"
+    if not directory.is_dir():
+        return []
+
+    results: List[Source] = []
+    for candidate in sorted(directory.iterdir()):
+        if candidate.name != "status.json" and not NETWORK_EVENT.fullmatch(
+            candidate.name
+        ):
+            continue
+        if candidate.is_symlink() or not candidate.is_file():
+            continue
+        results.append(
+            Source(
+                "network/" + candidate.name,
+                candidate,
+                configuration.destination / "network-monitor" / candidate.name,
+            )
+        )
+    return results
+
+
+def run_backup(configuration: Configuration) -> Dict[str, Any]:
+    results: List[Dict[str, Any]] = []
+    for source in database_sources(configuration):
+        try:
+            results.append(backup_database(source, configuration))
+        except (OSError, sqlite3.Error, ValueError) as error:
+            result: Dict[str, Any] = {
+                "name": source.name,
+                "kind": "database",
+                "status": "error",
+                "error_type": type(error).__name__,
+            }
+            if isinstance(error, sqlite3.Error):
+                sqlite_errorcode = getattr(error, "sqlite_errorcode", None)
+                sqlite_errorname = getattr(error, "sqlite_errorname", None)
+                if isinstance(sqlite_errorcode, int):
+                    result["sqlite_errorcode"] = sqlite_errorcode
+                if isinstance(sqlite_errorname, str):
+                    result["sqlite_errorname"] = sqlite_errorname
+            results.append(result)
+
+    for source in file_sources(configuration) + network_sources(configuration):
+        try:
+            results.append(backup_file(source))
+        except (OSError, ValueError) as error:
+            results.append(
+                {
+                    "name": source.name,
+                    "kind": "file",
+                    "status": "error",
+                    "error_type": type(error).__name__,
+                }
+            )
+
+    status: Dict[str, Any] = {
+        "observed_at": _timestamp(),
+        "status": (
+            "error"
+            if any(
+                result["status"] == "error"
+                or (
+                    result.get("kind") == "database"
+                    and result["status"] == "missing"
+                )
+                for result in results
+            )
+            else "ok"
+        ),
+        "sources": results,
+    }
+    _atomic_bytes(
+        configuration.destination / "backup-status.json",
+        (json.dumps(status, sort_keys=True, separators=(",", ":")) + "\n").encode(),
+    )
+    return status
+
+
+def restore_missing(configuration: Configuration) -> Dict[str, Any]:
+    results: List[Dict[str, Any]] = []
+    for source in database_sources(configuration):
+        wal = Path(str(source.source) + "-wal")
+        shared_memory = Path(str(source.source) + "-shm")
+        if source.source.exists() or wal.exists() or shared_memory.exists():
+            results.append({"name": source.name, "status": "existing"})
+            continue
+        if not source.destination.is_file() or source.destination.is_symlink():
+            results.append({"name": source.name, "status": "missing_snapshot"})
+            continue
+        try:
+            _backup_sqlite(source.destination, source.source)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            results.append(
+                {
+                    "name": source.name,
+                    "status": "error",
+                    "error_type": type(error).__name__,
+                }
+            )
+            continue
+        results.append({"name": source.name, "status": "restored"})
+
+    return {
+        "observed_at": _timestamp(),
+        "status": (
+            "error" if any(result["status"] == "error" for result in results) else "ok"
+        ),
+        "sources": results,
+    }
+
+
+def install() -> Dict[str, Any]:
+    script = Path(__file__).resolve()
+    configuration: Dict[str, Any] = {
+        "Label": LABEL,
+        "ProgramArguments": ["/usr/bin/python3", str(script), "run"],
+        "WorkingDirectory": str(script.parent),
+        "RunAtLoad": True,
+        "StartInterval": SMALL_DATABASE_INTERVAL_SECONDS,
+        "ProcessType": "Background",
+        "StandardOutPath": "/dev/null",
+        "StandardErrorPath": "/dev/null",
+    }
+    encoded = plistlib.dumps(configuration, sort_keys=True)
+
+    destination = Path.home() / "Library" / "LaunchAgents" / (LABEL + ".plist")
+    unchanged = destination.is_file() and destination.read_bytes() == encoded
+    if not unchanged:
+        _atomic_bytes(destination, encoded)
+
+    service = "gui/" + str(os.getuid())
+    identity = service + "/" + LABEL
+    probe = subprocess.run(
+        ["/bin/launchctl", "print", identity],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if probe.returncode == 0 and unchanged:
+        return {"status": "already_running", "label": LABEL, "service": identity}
+    if probe.returncode == 0:
+        stopped = subprocess.run(
+            ["/bin/launchctl", "bootout", identity],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if stopped.returncode != 0:
+            raise RuntimeError("existing backup LaunchAgent could not be stopped")
+
+    started = subprocess.run(
+        ["/bin/launchctl", "bootstrap", service, str(destination)],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if started.returncode != 0:
+        raise RuntimeError("backup LaunchAgent could not be started")
+    verified = subprocess.run(
+        ["/bin/launchctl", "print", identity],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if verified.returncode != 0:
+        raise RuntimeError("backup LaunchAgent started but could not be verified")
+    return {"status": "installed", "label": LABEL, "service": identity}
+
+
+def read_status(configuration: Configuration) -> Dict[str, Any]:
+    path = configuration.destination / "backup-status.json"
+    if not path.is_file():
+        return {"status": "not_started"}
+    with path.open("r", encoding="utf-8") as handle:
+        decoded: object = json.load(handle)
+    if not isinstance(decoded, dict):
+        raise ValueError("backup status is not an object")
+    return cast(Dict[str, Any], decoded)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command")
+    commands.add_parser("run", help="run one allowlisted backup")
+    commands.add_parser("status", help="read the last backup result")
+    commands.add_parser("install", help="install the scheduled user LaunchAgent")
+    restore = commands.add_parser("restore", help="restore absent databases only")
+    restore.add_argument("--missing", action="store_true", required=True)
+    args = parser.parse_args(argv)
+    configuration = default_configuration()
+    if args.command == "run":
+        result = run_backup(configuration)
+    elif args.command == "status":
+        result = read_status(configuration)
+    elif args.command == "restore":
+        result = restore_missing(configuration)
+    elif args.command == "install":
+        result = install()
+    else:
+        parser.print_help()
+        return 2
+    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+    return 1 if result["status"] in {"error", "not_started"} else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

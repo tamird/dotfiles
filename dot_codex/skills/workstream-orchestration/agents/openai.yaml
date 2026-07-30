@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workstream Orchestration"
+  short_description: "Coordinate safe multi-agent engineering work"
+  default_prompt: "Apply $workstream-orchestration to coordinate the explicitly authorized engineering work."

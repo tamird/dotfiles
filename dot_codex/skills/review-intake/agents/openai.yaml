@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Intake"
+  short_description: "Safely service human code-review requests"
+  default_prompt: "Use $review-intake to discover and safely deduplicate authorized human review requests."

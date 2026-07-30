@@ -1,0 +1,96 @@
+---
+name: pull-request-delivery
+description: Prepare and advance an explicitly authorized pull request while checking ownership, contribution rules, exact-head validation, normal hooks, and review and merge boundaries.
+---
+
+# Pull Request Delivery
+
+Use `$change-record-writing` for the change record and `$maintainer-review`
+for the complete design. Read `~/Google Drive/My Drive/Codex/runtime/operator-profile.md`
+when repository-specific publication, attribution, fallback-review, or
+draft policy is relevant. Missing private authority is a blocker.
+
+## Establish the actual authority
+
+Verify the exact repository, checkout, branch, integration base, full remote
+head, original implementing owner, current pull-request state, and user-
+authorized action. Account access does not make another agent's change ours.
+Do not modify someone else's branch, description, threads, or reviewers.
+
+Use the unchanged normal Git identity, signing, hooks, and configuration.
+Do not change Git or HTTP settings, bypass hooks, or impersonate a review
+signature. Use exact-head `--force-with-lease` only when the user has
+authorized the intended branch. Stop and report a genuine authorization,
+credential, ownership, or hook blocker.
+
+Before pushing a branch rebased on a shared default branch, verify that the
+intended authenticated remote's remote-tracking default branch matches the
+actual remote head. Coordinate shared worktrees before safely fast-forwarding
+that ref: fetching an object or using `--no-write-fetch-head` alone need not
+update `origin/<default>`. Hooks comparing `<remote>/<default>..HEAD` must
+see the real integration base. Fix a stale ref; never bypass a multi-author
+hook, skip verification, or change Git configuration to hide the problem.
+
+Respect the current repository instructions and operator profile. Choose
+ready or draft status from the actual authorized workflow; do not infer a
+draft default. Use an independent base unless stacking is semantically
+necessary and authorized.
+
+## Validate the complete change
+
+Rebase only for a verified conflict, a necessary merged prerequisite, an
+actual integration-branch failure, or a user request. Verify conflicts from
+the provider's native current-head result, not a normalized Boolean or a
+review-blocked state. Do not invalidate good CI through speculative rebases.
+
+Change the authoritative source, use its canonical generator, and run the
+smallest meaningful validation. For each exact head, distinguish verified
+causal failure, integration-branch breakage, infrastructure incident,
+quarantine, cancellation, pending work, and absent evidence. Never call an
+unverified or unsuccessful check green.
+
+For a genuinely shared required-check failure, verify and link the actual
+source, failure, owner, and existing correction on each affected change.
+Route implementation to the original owner. Refresh an existing evidence-
+backed analysis when its head or material failure changes; do not turn
+aggregate incident status into a substitute for the individual diagnosis.
+
+Label a partial CI assessment preliminary. Identify its exact head, each
+still-running material job, and the evidence for whether further failures
+could change the diagnosis. Finalize only after the material checks settle or
+verified evidence makes further failures reasonably unlikely. If a later
+failure disproves the assessment, edit the original comment: retain the
+original prediction, strike through obsolete claims, and append the updated
+analysis and primary evidence. Use Markdown-linked citations in a GitHub
+comment; plain-prose change-record restrictions do not apply. Verify the
+rendered correction.
+
+## Keep reviews and ownership current
+
+Apply repository-specific automated review or fallback rules only when the
+operator profile authorizes them. Verify the provider's current availability,
+actual bot identity, draft and frozen state, full head, prior review, and
+existing requests. Never request a review for a draft or frozen change, treat
+an automated finding as a human request, or start a competing scanner.
+
+When the user authorizes human solicitation, use `$reviewer-outreach`.
+Re-request a human review only after that review's substantive findings have
+actually been addressed. Register authorized outgoing threads with their
+existing source owner; follow genuine replies without creating new work.
+
+Explicitly acknowledge every substantive top-level human request after
+verifying its disposition against the current head. When the provider cannot
+thread a reply to the original comment or review, quote each reviewer and
+the relevant request in one concise top-level reply; explain what changed,
+cite the verified evidence, and identify which requests remain unresolved.
+Do not duplicate an existing acknowledgment, misrepresent an older review
+as current, self-resolve a human concern, or substitute a status update for
+a substantive answer.
+
+Monitor exact-head mergeability, required checks, owner review, comments,
+and in-place merge-validation results within the existing workstream. Wake
+the original implementation owner when a real action is required.
+
+Preparing, validating, publishing, or obtaining approval never authorizes a
+merge, auto-merge, merge command, review bypass, or check bypass. Each needs
+explicit user authorization for the specific pull request and action.

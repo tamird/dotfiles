@@ -1,4 +1,0 @@
-interface:
-  display_name: "Shantanu Reviewer"
-  short_description: "Review oaipkg changes through Shantanu’s lens"
-  default_prompt: "Use $shantanu-reviewer to adversarially review this oaipkg change."

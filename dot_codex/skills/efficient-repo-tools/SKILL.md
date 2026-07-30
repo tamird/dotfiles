@@ -1,72 +1,53 @@
 ---
 name: efficient-repo-tools
-description: Use efficient, bounded Git and repository traversal. Apply when searching large repositories, inspecting content history or many Git objects, comparing broad diffs, or designing commands whose repeated scans could waste CPU, I/O, or context.
+description: Search and inspect repositories using bounded, indexed Git operations, precise pathspecs, native batching, and minimal process, filesystem, and output cost.
 ---
 
 # Efficient Repo Tools
 
-Use indexed producers, narrow traversal scopes, and batched operations. Avoid
-repeatedly walking the same repository to answer related questions.
+Use indexed producers, narrow scopes, and batched operations. Never repeat
+an expensive traversal merely because the first operation is slow.
 
-## Search once
+## Search the existing index
 
-- Prefer Git's index-aware commands when they answer the question: use
-  `git grep` instead of `ripgrep`, and `git ls-files` instead of `find`.
-- Invoke `git` through the user's `PATH` rather than hard-coding a platform
-  binary. Git exports its selected helper directory to hooks and subprocesses,
-  so explicitly invoking Xcode Git also makes pre-push checks use Xcode Git
-  instead of the user's configured wrapper and optimized installation.
-- Create linked worktrees through the owning tool's documented lifecycle and
-  directory layout. Ad hoc worktrees can escape cleanup and leave their own
-  filesystem-monitor daemons running indefinitely.
-- Combine related predicates into one traversal. Do not launch concurrent or
-  repeated whole-repository scans for related questions.
-- Do not start a duplicate search, build, or generator because an existing
-  command is slow. Let it finish or inspect that process before doing more work.
-- Do not put a short timeout around a cold whole-worktree `git status` and
-  immediately retry it. A killed status cannot persist its refreshed index, so
-  the retry repeats the same full-tree walk. Let one warmup finish, or cancel
-  once and avoid reissuing the scan.
-- Avoid `git status --untracked-files=all` unless every individual untracked
-  path is required. `normal` can report an untracked directory without
-  recursively enumerating its contents and is much cheaper in large trees.
-- Remove duplicate or subsumed predicates and scopes before traversal.
-- Push known paths, revisions, fields, and record constraints into the producer
-  instead of scanning broadly and filtering afterward.
-- For a language-specific symbol, restrict both the file extension and any
-  known root. Git combines positive pathspecs as a union, not an intersection:
-  `git grep -F symbol -- src ':*.py'` still searches every Python file in the
-  repository. Use one combined pathspec, such as
-  `git grep -F symbol -- ':(glob)src/**/*.py'`, or use `src` alone when the
-  extension restriction is unnecessary.
-- Prefer a literal directory pathspec over `directory/**` when searching its
-  whole subtree. The wildcard adds per-path matching and can prevent Git from
-  pruning unrelated tree entries.
-- Verify that a piped consumer actually reads standard input. Push the filter
-  into the producer or use a stream matcher when it does not.
+- Prefer `git grep` to `rg` or recursive text scanning and `git ls-files` to
+  `find`. Use the actual checkout, not another agent's worktree.
+- Invoke Git through the existing `PATH`. Preserve the selected wrapper,
+  `GIT_EXEC_PATH`, hooks, and inherited environment; prepend a required
+  virtual environment instead of replacing the path or forcing other tools.
+- Create or remove worktrees only through their documented owner and only
+  when authorized. Do not interrupt an active filesystem monitor.
+- Combine related predicates into one bounded traversal. Push known roots,
+  paths, object identifiers, revisions, and selected fields into the producer.
+- Keep a root and extension in one pathspec: positive pathspecs are a union,
+  so `git grep -F name -- src ':*.py'` is not confined to `src`. Use
+  `git grep -F name -- ':(glob)src/**/*.py'` when both are necessary.
+- Use a literal directory instead of a recursive wildcard when the whole
+  subtree is required. Verify that a piped consumer actually reads its input.
+- Prefer fixed strings, native multi-pattern search, and set-oriented commands
+  to regular expressions, shell loops, and one process per object. Batch
+  object queries with `git cat-file --batch` or `--batch-check`.
 
-## Choose efficient operations
+## Avoid full worktree walks
 
-- Prefer set-oriented and batched commands over shell loops that start one
-  process per input. Use native multi-pattern, all-match, batch-input, or
-  file-list modes.
-- Use the least expressive matcher that preserves the semantics. Prefer exact
-  or fixed-string matching when a regular expression adds no value.
-- Keep independent literal alternatives as separate fixed-string patterns when
-  the tool can prefilter them. For commit subjects/messages, use repeated
-  `git log --grep=<literal>` with `--fixed-strings`, not one ERE alternation.
-- For large Git regex searches, prefer `git grep -P` over `git grep -E` when
-  the PCRE and ERE expressions are equivalent.
-- Feed multiple object IDs to one `git cat-file --batch-check` or
-  `git cat-file --batch` process.
+- Never repeatedly time out and restart a cold `git status`: an interrupted
+  index warmup repeats the same full scan. Let one operation complete or stop
+  without starting another.
+- Avoid `git status --untracked-files=all` unless every path is required.
+  Prefer normal untracked-directory reporting or
+  `git ls-files --others --exclude-standard --directory --no-empty-directory`.
+- For tracked-change existence, use
+  `git diff --no-ext-diff --quiet -- <known-paths>`; use `--cached` for the
+  index. Do not invoke external diff drivers when only existence matters.
+- Inspect an existing search, build, or generator before launching another.
 
 ## Bound history and output
 
-- Find likely current paths before using `git log -S` or `-G`, search relevant
-  revisions first, and add `--all` only when cross-reference history matters.
-- Pass limits such as `git log -n` to the producer, but remember that a
-  match-count limit does not bound traversal when fewer matches exist. Add a
-  relevant revision range or `--since` window. Use `--follow` only when rename
-  or copy history is relevant.
-- Request only what the next step needs. Prefer existence, count, name-only,
-  selected-field, and bounded-output modes over full records.
+- Put revisions, pickaxe flags, and limits before `--`; later arguments are
+  pathspecs. Use `git log --max-count=5 -Ssymbol -- path`.
+- Search relevant paths and revisions first. Use `--all`, `--follow`, or
+  expensive history only when cross-branch or rename evidence is required.
+- Combine output limits with a relevant revision or time range: a match-count
+  limit alone cannot bound an unsuccessful history walk.
+- Request only the required existence, count, field, path, or bounded record.
+  Deduplicate overlapping search predicates before running the command.

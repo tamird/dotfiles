@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Move Codex file-backed memory to durable storage without a path gap."""
+
+from __future__ import annotations
+
+import argparse
+import ctypes
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import sys
+import tempfile
+from typing import Callable, Dict, Sequence, Tuple, Union
+
+
+AT_FDCWD = -2
+RENAME_SWAP = 0x00000002
+BLOCK_SIZE = 1024 * 1024
+Fingerprint = Dict[str, Tuple[str, str, int, int]]
+
+
+def fingerprint(root: Path) -> Tuple[Fingerprint, int]:
+    """Record every directory, regular file, and preserved symlink once."""
+    if root.is_symlink() or not root.is_dir():
+        raise NotADirectoryError(str(root))
+
+    entries: Fingerprint = {}
+    total = 0
+    for parent, directories, files in os.walk(root, followlinks=False):
+        current = Path(parent)
+        for name in sorted(directories + files):
+            candidate = current / name
+            relative = str(candidate.relative_to(root))
+            details = candidate.lstat()
+            mode = stat.S_IMODE(details.st_mode)
+            if stat.S_ISLNK(details.st_mode):
+                entries[relative] = ("symlink", os.readlink(candidate), 0, mode)
+            elif stat.S_ISDIR(details.st_mode):
+                entries[relative] = ("directory", "", 0, mode)
+            elif stat.S_ISREG(details.st_mode):
+                digest = hashlib.sha256()
+                with candidate.open("rb") as content:
+                    while True:
+                        block = content.read(BLOCK_SIZE)
+                        if not block:
+                            break
+                        digest.update(block)
+                entries[relative] = (
+                    "file",
+                    digest.hexdigest(),
+                    details.st_size,
+                    mode,
+                )
+                total += details.st_size
+            else:
+                raise ValueError("refusing special memory entry: " + relative)
+    return entries, total
+
+
+def exchange(left: Path, right: Path) -> None:
+    """Atomically exchange two existing macOS filesystem entries."""
+    if sys.platform != "darwin":
+        raise RuntimeError("atomic memory migration requires macOS")
+    libc = ctypes.CDLL(None, use_errno=True)
+    rename = libc.renameatx_np
+    rename.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    rename.restype = ctypes.c_int
+    if rename(
+        AT_FDCWD,
+        os.fsencode(left),
+        AT_FDCWD,
+        os.fsencode(right),
+        RENAME_SWAP,
+    ):
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+
+
+def migrate(
+    source: Path,
+    destination: Path,
+    *,
+    swap: Callable[[Path, Path], None] = exchange,
+) -> Dict[str, Union[str, int]]:
+    """Verify a complete Git repository before atomically replacing its path."""
+    if source.is_symlink():
+        if source.resolve(strict=True) != destination.resolve(strict=True):
+            raise FileExistsError("memory path points to a different destination")
+        entries, total = fingerprint(destination)
+        return {"status": "already_migrated", "files": len(entries), "bytes": total}
+    if not source.is_dir() or not (source / ".git").is_dir():
+        raise NotADirectoryError("memory source must be a complete Git repository")
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError("refusing to overwrite existing durable memories")
+    if not destination.parent.is_dir() or destination.parent.is_symlink():
+        raise NotADirectoryError("durable memory parent must already exist")
+
+    expected, total = fingerprint(source)
+    temporary_link = source.with_name(
+        "." + source.name + ".migration." + str(os.getpid())
+    )
+    if temporary_link.exists() or temporary_link.is_symlink():
+        raise FileExistsError("refusing to overwrite an existing migration entry")
+
+    with tempfile.TemporaryDirectory(
+        prefix=".memories-migration.", dir=str(destination.parent)
+    ) as staging:
+        staged = Path(staging) / "memories"
+        shutil.copytree(source, staged, symlinks=True, copy_function=shutil.copy2)
+        actual, _ = fingerprint(staged)
+        if actual != expected:
+            raise RuntimeError("staged memories do not match the source")
+        if fingerprint(source)[0] != expected:
+            raise RuntimeError("memory source changed during migration")
+        os.chmod(staged, 0o700)
+        os.replace(staged, destination)
+
+    exchanged = False
+    try:
+        os.symlink(str(destination), str(temporary_link), target_is_directory=True)
+        if fingerprint(source)[0] != expected:
+            raise RuntimeError("memory source changed before atomic exchange")
+        swap(source, temporary_link)
+        exchanged = True
+        if not source.is_symlink() or source.resolve(
+            strict=True
+        ) != destination.resolve(strict=True):
+            raise RuntimeError("native memory path did not resolve to durable memory")
+        if fingerprint(destination)[0] != expected:
+            raise RuntimeError("durable memories changed during atomic exchange")
+        if fingerprint(temporary_link)[0] != expected:
+            raise RuntimeError("original memories changed during atomic exchange")
+        shutil.rmtree(temporary_link)
+    except BaseException:
+        if exchanged:
+            swap(source, temporary_link)
+        if temporary_link.is_symlink():
+            temporary_link.unlink()
+        raise
+
+    return {"status": "migrated", "files": len(expected), "bytes": total}
+
+
+def main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    try:
+        parser.parse_args(arguments)
+    except SystemExit as error:
+        return 0 if error.code == 0 else 2
+
+    home = Path.home()
+    try:
+        result = migrate(
+            home / ".codex" / "memories",
+            home / "Google Drive" / "My Drive" / "Codex" / "memories",
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        print("Codex memory migration stopped: " + str(error), file=sys.stderr)
+        return 1
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+"""Archive explicitly selected Codex artifacts without changing their sources."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+from typing import BinaryIO, Iterable
+
+
+@dataclass(frozen=True)
+class Source:
+    category: str
+    relative_path: Path
+
+
+def _direct_files(home: Path, relative: str, category: str, suffix: str = "") -> list[Source]:
+    directory = home / relative
+    try:
+        mode = directory.lstat().st_mode
+    except FileNotFoundError:
+        return []
+    if not stat.S_ISDIR(mode):
+        raise NotADirectoryError(directory)
+    sources: list[Source] = []
+    for path in sorted(directory.iterdir()):
+        if path.name.startswith(".") or (suffix and path.suffix != suffix):
+            continue
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            raise ValueError(f"refusing source symlink: {path}")
+        if stat.S_ISREG(mode):
+            sources.append(Source(category, path.relative_to(home)))
+    return sources
+
+
+def _configured_entry(raw: object, *, directory: bool) -> tuple[str, Path, str]:
+    if not isinstance(raw, dict):
+        raise ValueError("artifact source must be an object")
+    allowed = {"category", "path", "suffix"} if directory else {"category", "path"}
+    if not {"category", "path"}.issubset(raw) or not set(raw).issubset(allowed):
+        raise ValueError("invalid artifact source fields")
+    category = raw.get("category")
+    value = raw.get("path")
+    suffix = raw.get("suffix", "")
+    if not isinstance(category, str) or not category or "\n" in category:
+        raise ValueError("artifact category must be a nonempty single line")
+    if not isinstance(value, str) or not value:
+        raise ValueError("artifact path must be a nonempty relative string")
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts or path.as_posix() != value:
+        raise ValueError("artifact path must be canonical and home-relative")
+    if not isinstance(suffix, str) or (suffix and (
+        not suffix.startswith(".") or "/" in suffix or "\\" in suffix
+    )):
+        raise ValueError("artifact suffix must be a simple file extension")
+    return category, path, suffix
+
+
+def selected_sources(home: Path) -> list[Source]:
+    configuration = (
+        home / "Google Drive" / "My Drive" / "Codex" / "runtime" / "artifact-sources.json"
+    )
+    mode = configuration.lstat().st_mode
+    if not stat.S_ISREG(mode):
+        raise ValueError("artifact source configuration must be a regular file")
+    if stat.S_IMODE(mode) & 0o077:
+        raise PermissionError("artifact source configuration must be private")
+    with _reader(configuration) as handle:
+        document: object = json.load(handle)
+    if not isinstance(document, dict) or set(document) != {"version", "directories", "files"}:
+        raise ValueError("invalid artifact source configuration")
+    directories = document.get("directories")
+    files = document.get("files")
+    if document.get("version") != 1 or not isinstance(directories, list) or not isinstance(files, list):
+        raise ValueError("unsupported artifact source configuration")
+    sources: list[Source] = []
+    for raw in directories:
+        category, relative, suffix = _configured_entry(raw, directory=True)
+        sources += _direct_files(home, str(relative), category, suffix)
+    for raw in files:
+        category, relative, _ = _configured_entry(raw, directory=False)
+        try:
+            mode = (home / relative).lstat().st_mode
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISREG(mode):
+            raise ValueError(f"refusing non-regular source: {home / relative}")
+        sources.append(Source(category, relative))
+    paths = [source.relative_path for source in sources]
+    if len(paths) != len(set(paths)):
+        raise ValueError("duplicate artifact destination")
+    return sources
+
+
+def _private_directory(root: Path, relative: Path = Path()) -> Path:
+    current = root
+    for part in (".", *relative.parts):
+        if part == ".":
+            path = current
+        else:
+            current /= part
+            path = current
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        if not stat.S_ISDIR(path.lstat().st_mode):
+            raise NotADirectoryError(f"refusing non-directory or symlink: {path}")
+        os.chmod(path, 0o700)
+    return current
+
+
+def _reader(path: Path) -> BinaryIO:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise ValueError(f"refusing non-regular file: {path}")
+    return os.fdopen(descriptor, "rb")
+
+
+def _digest(path: Path) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    size = 0
+    with _reader(path) as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    return digest.hexdigest(), size
+
+
+@dataclass(frozen=True)
+class Record:
+    category: str
+    source: str
+    recovered: str
+    bytes: int
+    sha256: str
+    original_mode: str
+    captured_at: str
+
+
+def _capture(home: Path, destination: Path, source: Source, captured_at: str) -> Record:
+    original = home / source.relative_path
+    original_stat = original.lstat()
+    if not stat.S_ISREG(original_stat.st_mode):
+        raise ValueError(f"refusing non-regular source: {original}")
+    directory = _private_directory(destination, source.relative_path.parent)
+    recovered = directory / source.relative_path.name
+    try:
+        descriptor = os.open(recovered, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        source_digest, source_size = _digest(original)
+        recovered_digest, recovered_size = _digest(recovered)
+        if (source_digest, source_size) != (recovered_digest, recovered_size):
+            raise FileExistsError(f"different archived artifact: {recovered}") from None
+        digest, size = source_digest, source_size
+    else:
+        digest_state = hashlib.sha256()
+        size = 0
+        try:
+            with _reader(original) as reader, os.fdopen(descriptor, "wb") as writer:
+                for chunk in iter(lambda: reader.read(1024 * 1024), b""):
+                    writer.write(chunk)
+                    digest_state.update(chunk)
+                    size += len(chunk)
+                writer.flush()
+                os.fsync(writer.fileno())
+            digest = digest_state.hexdigest()
+        except BaseException:
+            recovered.unlink(missing_ok=True)
+            raise
+    return Record(source.category, str(source.relative_path), str(source.relative_path),
+                  size, digest, oct(stat.S_IMODE(original_stat.st_mode)), captured_at)
+
+
+def collate(home: Path, destination: Path, sources: Iterable[Source] | None = None) -> list[Record]:
+    selected = list(selected_sources(home) if sources is None else sources)
+    paths = [source.relative_path for source in selected]
+    if len(paths) != len(set(paths)) or any(path.is_absolute() or ".." in path.parts for path in paths):
+        raise ValueError("artifact paths must be distinct and home-relative")
+    _private_directory(destination)
+    manifest = destination / "MANIFEST.jsonl"
+    previous: dict[str, dict[str, object]] = {}
+    try:
+        manifest.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        with _reader(manifest) as handle:
+            for line in handle:
+                entry: object = json.loads(line)
+                if not isinstance(entry, dict):
+                    raise ValueError("invalid recovered artifact manifest")
+                recovered = entry.get("recovered")
+                if not isinstance(recovered, str) or recovered in previous:
+                    raise ValueError("invalid or duplicate recovered artifact manifest entry")
+                previous[recovered] = entry
+    captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    records = [_capture(home, destination, source, captured_at) for source in selected]
+    previous.update((record.recovered, asdict(record)) for record in records)
+    temporary = destination / f".MANIFEST.jsonl.{os.getpid()}.tmp"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            for recovered in sorted(previous):
+                handle.write(json.dumps(previous[recovered], sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, manifest)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return records
+
+
+def main(arguments: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    try:
+        parser.parse_args(arguments)
+    except SystemExit as error:
+        return 0 if error.code == 0 else 2
+
+    home = Path.home()
+    destination = home / "Google Drive" / "My Drive" / "Codex" / "recovered"
+    records = collate(home, destination)
+    print(json.dumps({"destination": str(destination), "files": len(records),
+                      "bytes": sum(record.bytes for record in records)}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

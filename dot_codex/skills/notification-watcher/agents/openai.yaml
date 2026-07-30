@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notification Watcher"
+  short_description: "Authenticate and route durable notifications"
+  default_prompt: "Use $notification-watcher to verify, deduplicate, and route incoming notifications."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packaging Review"
+  short_description: "Review Python packaging and dependency safety"
+  default_prompt: "Use $packaging-review to assess this packaging or dependency change against its actual producer and consumers."

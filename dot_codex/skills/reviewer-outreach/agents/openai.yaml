@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewer Outreach"
+  short_description: "Find and contact the right authorized reviewer"
+  default_prompt: "Use $reviewer-outreach to identify qualified reviewers and send a review request only when explicitly authorized."

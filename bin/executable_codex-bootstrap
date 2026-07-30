@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+root="$HOME/Google Drive/My Drive/Codex"
+test -d "$HOME/Google Drive/My Drive"
+mkdir -p "$HOME/.codex" "$root/rollouts"
+if [ ! -e "$HOME/.codex/sessions" ] && [ ! -L "$HOME/.codex/sessions" ]; then
+    ln -s "$root/rollouts" "$HOME/.codex/sessions"
+fi
+if [ -d "$root/memories" ] && [ ! -e "$HOME/.codex/memories" ] && [ ! -L "$HOME/.codex/memories" ]; then
+    ln -s "$root/memories" "$HOME/.codex/memories"
+fi
+
+/usr/bin/python3 "$HOME/.codex/skills/codex-runtime/scripts/codex-state-backup" restore --missing
+/usr/bin/python3 "$HOME/.codex/skills/codex-runtime/scripts/codex-state-backup" install
+/usr/bin/python3 "$HOME/.codex/skills/codex-runtime/scripts/codex-network-monitor" install

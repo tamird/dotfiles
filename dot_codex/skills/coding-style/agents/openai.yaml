@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coding Style"
+  short_description: "Design concise, correct, evidence-backed changes"
+  default_prompt: "Apply $coding-style to design, implement, and self-review the complete change."

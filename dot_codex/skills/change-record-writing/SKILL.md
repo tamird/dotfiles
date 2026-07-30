@@ -1,46 +1,78 @@
 ---
 name: change-record-writing
-description: Write or revise commit messages, pull request titles and descriptions, and precursor tracking comments as durable change records. Use when preparing a commit or pull request, rewriting a PR body that will become a squash-commit message, or explaining an extracted precursor.
+description: Write or revise commit messages, pull request titles and descriptions, and precursor records as concise, evidence-backed accounts of the cumulative change, its cause, and its observable effect.
 ---
 
 # Change Record Writing
 
-Apply `$audience-aware-writing`. Assume repository fluency, but not private
-implementation history, future branches, or unstated rationale.
+Apply `$audience-aware-writing`. Follow the actual repository contribution
+rules and the user's applicable writing policy; do not turn either into a
+universal convention.
 
-Before drafting, inspect recent relevant history for the affected paths. Follow
-the repository's subject prefixes, capitalization, terminology, and body style.
-Use the defaults below only where local history does not establish a convention.
+## Establish the change
 
-## Describe the change
+Inspect the complete merge-base change, authoritative producer, actual
+consumer, affected owner, original invariant, and observable behavior. Lead
+with what fails or needs to change, who or what it affects, and why the final
+correction is necessary. Explain how the producer causes the consumer-visible
+effect and how the change corrects it. Independently reviewable prerequisites
+must explain their own problem and relationship to the eventual change.
 
-- Treat a pull request title as the eventual commit subject and its description
-  as the commit body.
-- Explain the delta from the merge base, why it is needed, the important
-  invariant it establishes, and non-obvious caveats.
-- Name concrete files, data, and behavior. Remove baseline truths, progress
-  notes, implementation trivia, and private or future context that does not help
-  a reviewer understand the change.
-- Do not add a test plan unless explicitly requested. Do not narrate validation
-  already covered by normal CI.
+Distinguish a source fix from a mitigation. If the cause is unknown, say so;
+explain why a bounded mitigation is warranted, how original evidence and
+observability remain available, and what ends the mitigation. Do not imply
+that a retry, reconstruction, synthetic reproduction, or correlation proves
+an unverified cause. For a surviving fallback or deferred cleanup, identify
+the actual owner, necessary prerequisite, and concrete removal condition.
 
-## Format the record
+For a regression, establish and cite the original invariant, introducing
+change, distinct exposure or rollout, trigger, concrete failure, test or CI
+gap, and final correction and regression coverage. Distinguish introduction
+from exposure, cause from symptom, and proof from inference. Explain why a
+platform-specific change applies on that platform, what occurs elsewhere,
+and whether the simpler shared alternative actually works. State measurable
+performance claims only with relevant measurements.
 
-- Separate subject from body with a blank line.
-- Limit the subject to 50 characters.
-- Use imperative mood and no terminal period.
-- Capitalize the subject unless the repository uses a subject-area prefix or
-  another local convention.
-- Wrap body text at 72 characters.
-- Use the body for what and why, not a step-by-step account of how.
-- Do not use Markdown headings in pull request descriptions.
+If a material causal fact cannot be verified, investigate before describing
+the change. Do not invent intent, users, effects, guarantees, measurements,
+historical failures, or a rationale inferred from unrelated conversation.
 
-## Handle references and precursors
+## Write the durable record
 
-- Prefer durable commit links over pull request references in permanent prose.
-- For a precursor extracted from another pull request, make the first top-level
-  tracking comment begin `Extracted from #<parent PR number>.` Then state the
-  concrete problem in the parent that required the extraction.
-- Explain the same causal relationship in the precursor description so the
-  change remains justified after the tracking context is gone. The tracking
-  comment is the exception to avoiding pull request references.
+Write a concise, discriminatory account of the final cumulative behavior,
+not a chronology or inventory. Explain non-obvious decisions and only the
+context needed to evaluate them. Cite primary evidence directly: source,
+introducing commit, failing job, authoritative design, or behavioral test.
+A conversation may establish coordination but cannot replace technical
+evidence or make the reader discover the incident analysis elsewhere.
+
+Follow the repository's subject prefixes, capitalization, wrapping,
+formatting, required test plan, and citation convention. Honor an explicit
+plain-prose, no-Markdown, no-heading, or no-bullets requirement. Use short
+paragraphs and real newlines; reject literal `\n`, local validation theater,
+filler about unchanged behavior, and unsupported claims. Include validation
+only when the repository, actual risk, or user requires it.
+
+Use unfenced, repository-linkified same-repository commit SHAs of at least
+nine characters, extending as needed for uniqueness and local linkification.
+Link directly to external artifacts and, in Slack, to the verified commit
+URL; never use a bare Slack SHA. Keep long references readable without hiding
+their reason.
+
+Exclude task priority, work queues, agents, checkouts, monitoring, personal
+coordination, who noticed the issue, local commands, and testing diaries
+unless an explicitly required detail explains observable behavior. Explain
+extracted precursors independently; add tracking comments only when requested
+or required by the actual repository.
+
+## Respect the authorization boundary
+
+Writing does not authorize editing product code, another author's record,
+publishing, soliciting or submitting review, changing pull-request state, or
+merging. Do not change Git identity, attribution, signing, hooks, HTTP
+configuration, or credentials. Keep any authorized delegated identity in
+its intended review or comment, never in a commit identity.
+
+When a record mutation is separately authorized, use the normal typed API or
+CLI and verify the resulting title, exact body, actual newlines, and rendered
+paragraphs. Otherwise return the requested text without publishing it.

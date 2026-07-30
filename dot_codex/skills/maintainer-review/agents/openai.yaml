@@ -1,4 +1,4 @@
 interface:
   display_name: "Maintainer Review"
-  short_description: "Review changes through maintainer evidence"
-  default_prompt: "Use $maintainer-review to review this cumulative change before completion."
+  short_description: "Review changes against maintainer evidence"
+  default_prompt: "Use $maintainer-review to review this cumulative change and report evidence-backed findings."

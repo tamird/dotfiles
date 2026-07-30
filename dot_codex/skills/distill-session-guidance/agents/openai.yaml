@@ -1,7 +1,7 @@
 interface:
   display_name: "Distill Session Guidance"
-  short_description: "Turn session lessons into durable guidance"
-  default_prompt: "Use $distill-session-guidance to review this session and improve durable guidance."
+  short_description: "Capture steering and distill durable guidance"
+  default_prompt: "Use $distill-session-guidance to capture reusable steering, reload pending thread guidance, or explicitly flush verified lessons."
 
 policy:
   allow_implicit_invocation: false

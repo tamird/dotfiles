@@ -1,0 +1,24 @@
+[project]
+name = "codex-notification-watcher"
+version = "0.1.0"
+description = "Bounded, restart-safe intake for verified source notifications."
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+codex-notification-watcher = "codex_notification_watcher:run"
+
+[dependency-groups]
+dev = ["basedpyright>=1.39,<2"]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.basedpyright]
+include = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codex_notification_watcher"]

@@ -1,4 +1,4 @@
-build --profile=/tmp/profile.json --starlark_cpu_profile=/tmp/profile.pb.gz
+startup --experimental_remote_repo_contents_cache
 build --experimental_output_paths=strip
 
 # Keep shared local Bazel caches bounded by age across workspaces.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pull Request Delivery"
+  short_description: "Safely prepare and advance pull requests"
+  default_prompt: "Use $pull-request-delivery to prepare or advance only the explicitly authorized pull request."

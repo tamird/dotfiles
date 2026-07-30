@@ -25,9 +25,10 @@ build, and submission constraints.
    Account for public APIs, ELF and BTF conventions, generated formats,
    and light skeletons as compatibility commitments.
 
-For BPF mail on this machine, run `mbsync -q bpf`, then index `~/Mail/bpf`
-with `lei index -r`. The Gmail label and isync channel are both named `bpf`;
-do not route them through `rfl-mail`.
+When an explicitly authorized task requires a configured private mailbox or
+message index, consult `~/Google Drive/My Drive/Codex/runtime/operator-profile.md` for
+the correct subsystem-specific routing. Public lore remains the default;
+the private profile neither authorizes mailbox access nor sending mail.
 
 ## Select BPF review lenses
 

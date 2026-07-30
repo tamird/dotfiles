@@ -1,63 +1,100 @@
 ---
 name: maintainer-review
-description: Review a cumulative repository change through evidence-backed expectations of relevant maintainers and affected paths. Use before declaring substantive implementation complete, before requesting maintainer review, or when local review history should shape a design or patch.
+description: Review a complete change for its evidenced need, ownership, invariants, meaningful coverage, precise contracts, measured cost, change record, and authorized review verdict.
 ---
 
 # Maintainer Review
 
-Apply `$audience-aware-writing` to the findings and related prose. Apply
-`$efficient-repo-tools` when gathering broad path or review history.
+Use `$efficient-repo-tools` for bounded evidence, `$coding-style` for design
+and implementation criteria, `$change-record-writing` for the rendered record,
+and `$audience-aware-writing` for findings. A review authorizes no source
+edit, publication, outreach, identity change, new workstream, or merge.
 
-Review the complete merge-base delta, not only the latest commit or working
-tree. Derive maintainer expectations from evidence; do not imitate tone or
-invent preferences. Review only: do not edit files or post comments unless the
-user asks.
+## Establish why the complete change belongs
 
-## Establish the review lens
+Verify the exact repository, author, full current head, target, merge base,
+complete changed files, unresolved discussion, and actual validation. Page
+provider results completely. Distinguish source from generated output, locks,
+fixtures, vendoring, and mechanical change.
 
-1. Identify the repository, merge base, complete changed-file set, and the
-   behavior and ownership boundaries affected.
-2. Identify relevant maintainers through path ownership, accepted commits, and
-   substantive review history. Treat ownership and automated assignments as
-   routing hints rather than proof of expertise.
-3. Inspect nearby code, accepted changes, and reviews of the same paths or
-   behavior. Prefer directly relevant evidence over merely recent evidence.
-4. Record the local design, coding, testing, comment, documentation, and review
-   expectations supported by that history.
+Trace the real producer, consumer, entrypoints, supported platforms, failure,
+ownership, and invariant. Review the cumulative change, including a live or
+merged parent or child when together they introduce or consume an interface.
+Inspect pre-existing code only when the change depends on or exposes it.
 
-Use the same evidence that informed implementation. Refresh it when the scope
-or design changes materially.
+Require an evidenced answer: what actually fails or is needed, whom it
+affects, why the existing mechanism cannot handle it, why this owner is
+correct, and how this change repairs the source. Approval, passing checks,
+implementation detail, or assertive prose is not evidence of necessity.
 
-## Review the cumulative change
+Increase scrutiny for hidden executable logic, broad handwritten changes,
+parallel policy or selectors, sensitive production behavior, unproven
+recovery, and expanding legacy. Mechanical breadth and author identity are
+not findings. Use private maintainer history only when the user authorizes
+the actual profile, and substantiate every conclusion independently.
 
-Start with behavior and design:
+## Test the design, coverage, and cost
 
-- What concrete problem changes?
-- What owned the behavior before, and what owns it afterward?
-- Which semantics, supported cases, failure modes, and costs change?
-- Does the implementation follow the affected project's conventions?
-- Could an existing mechanism solve the problem with fewer concepts?
+Apply `$coding-style` to canonical ownership, supported consumers, dependency
+boundaries, meaningful regression tests, precise checked types, comments,
+deferred cleanup, and shared-platform behavior. Report the actual violated
+contract; do not reject legitimate dynamic or generated interfaces.
 
-Then inspect correctness, repository-wide cost, performance evidence, tests,
-generated artifacts, comments, documentation, and review prose. Look for
-special cases or compatibility layers that indicate a design problem.
+Challenge duplicate mechanisms; unsupported fallbacks, compatibility paths,
+ignores, or dynamic imports; hidden source embedded in shell or configuration;
+silent errors; lost evidence; obsolete parallel machinery; and unaccounted
+shared startup, network, resolution, generation, or action cost. Accept
+small, justified boundary glue.
 
-For refactors and migrations, inspect the cumulative merge-base diffstat with
-generated files separated out. A mostly additive replacement is a design smell:
-identify which old machinery, consumers, or policies remain, and require a
-clear reason for every path that survives beside the new foundation.
+For each test, identify a plausible broken implementation that would fail.
+Reject tautologies, unverified mock or import assertions, incidental
+snapshots, and oversized fixtures. Verify relevant existing contracts and
+flag avoidable `Any`, unchecked casts, suppressions, broad exceptions,
+ambiguous flags, magic literals, and non-exhaustive domain handling.
 
-Do not apply a historical preference mechanically. Reconcile each finding with
-the intended invariants and current constraints, then prefer the correction
-that simplifies the overall model.
+Require the actual explanation for a platform-specific correction, behavior
+on other supported platforms, and evidence whether one common fix works.
+Support measurable performance claims with the affected workflow, baseline,
+before and after, cache conditions, and memory or sharing costs.
 
-## Close the workstream
+## Establish incidents and escaped failures
 
-Lead with actionable findings ordered by severity and grounded in concrete
-files and lines. Separate confirmed defects from questions that need evidence.
-When implementation is in scope, send valid corrections back to the existing
-implementers when practical, then review the cumulative result again. If the
-change is clean, say so and name any residual risks.
+Trace an incident to its original artifact, producer, worker, cache identity,
+timing, and first-party failure. A later successful retry, different worker,
+synthetic corruption, or correlation is not a cause. Reject mitigation that
+hides recurrence or weakens a healthy path; a necessary mitigation must
+retain evidence, expose activation, fail closed, bound cost, and identify its
+owner, justification, and removal condition.
 
-When asked to post GitHub feedback, batch non-overlapping findings in one
-review. Reply in the existing thread when responding to an inline comment.
+For a default-branch regression, establish the introducing change, trigger,
+actual failed job, selected tests, merge gate, environment, and why the
+defect was allowed to land. Require regression coverage or a correction to
+the real selection or required-check gap. If prevention is infeasible,
+identify its primary evidence, owner, and blocker. Do not invent a wider
+incident or initiative.
+
+## Review the record and deliver the right verdict
+
+Apply `$change-record-writing` to the actual title and rendered cumulative
+description, including causal reason, primary citations, platform rationale,
+and the repository's real formatting. Never invent an author's rationale or
+edit another person's record without explicit authorization.
+
+Before approving or disputing a citation, verify the provider's first-party
+raw Markdown `body`, its actual link destination, and the concise supporting
+evidence. Rendered or plain `bodyText` cannot establish a link's destination.
+
+Rank substantiated findings by security, correctness, data, production cost,
+and maintainability. Explain the concrete trigger, violated invariant,
+affected consumer, impact, and smallest source-owned correction. Anchor each
+independent source defect inline; use one concise overall comment for
+cross-cutting design, prose, or unanchorable evidence. Batch repetition and
+reply in the existing discussion.
+
+CI owns failed-check gating: do not request changes merely because a check is
+red, pending, or unrelated. When sound code has only a deficient description,
+leave a neutral finding; neither approve nor request changes. Verify the
+repository's actual owner scope, draft policy, neutral-only requirements,
+and explicitly authorized delegated attribution; do not claim an approval
+satisfies another owner's gate. Publish only when authorized, reverify the
+exact head and inline anchors, and verify the resulting provider receipt.

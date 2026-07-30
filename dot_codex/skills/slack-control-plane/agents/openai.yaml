@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slack Control Plane"
+  short_description: "Handle authorized Slack tasks and verified updates"
+  default_prompt: "Use $slack-control-plane to process an authorized Slack control message or publish a verified update in its original thread."
