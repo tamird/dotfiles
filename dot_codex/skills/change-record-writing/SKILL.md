@@ -47,8 +47,9 @@ A conversation may establish coordination but cannot replace technical
 evidence or make the reader discover the incident analysis elsewhere.
 
 Follow the repository's subject prefixes, capitalization, wrapping,
-formatting, required test plan, and citation convention. Honor an explicit
-plain-prose, no-Markdown, no-heading, or no-bullets requirement. Use short
+formatting, required test plan, and citation convention. Keep pull-request
+titles at or below 50 characters, including any subject prefix. Honor an
+explicit plain-prose, no-Markdown, no-heading, or no-bullets requirement. Use short
 paragraphs and real newlines; reject literal `\n`, local validation theater,
 filler about unchanged behavior, and unsupported claims. Include validation
 only when the repository, actual risk, or user requires it.

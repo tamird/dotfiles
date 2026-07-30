@@ -10,13 +10,13 @@ import json
 import os
 from pathlib import Path
 import plistlib
-import re
 import shutil
 import sqlite3
+import socket
 import subprocess
 import tempfile
 import time
-from typing import Any, Dict, List, Optional, Sequence, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, cast
 from urllib.parse import quote
 
 
@@ -24,7 +24,6 @@ LABEL = "local.codex.state-backup"
 LARGE_DATABASE_BYTES = 64 * 1024 * 1024
 LARGE_DATABASE_INTERVAL_SECONDS = 3600
 SMALL_DATABASE_INTERVAL_SECONDS = 300
-NETWORK_EVENT = re.compile(r"events\.jsonl(?:\.\d+)?\Z")
 
 
 @dataclass(frozen=True)
@@ -47,6 +46,49 @@ class Source:
     destination: Path
 
 
+def _leader_path(configuration: Configuration) -> Path:
+    return configuration.destination / "backup-leader.json"
+
+
+def _leader(configuration: Configuration) -> Optional[str]:
+    path = _leader_path(configuration)
+    if not path.is_file():
+        return None
+    with path.open("r", encoding="utf-8") as handle:
+        record: object = json.load(handle)
+    if not isinstance(record, dict) or not isinstance(record.get("hostname"), str):
+        raise ValueError("backup leader record is invalid")
+    return record["hostname"]
+
+
+def _require_leader(configuration: Configuration) -> None:
+    elected = _leader(configuration)
+    if elected != socket.gethostname():
+        raise PermissionError("only the elected backup leader may publish shared state")
+
+
+def _elect_leader(configuration: Configuration, *, takeover: bool = False) -> str:
+    hostname = socket.gethostname()
+    elected = _leader(configuration)
+    if elected is not None and elected != hostname and not takeover:
+        raise PermissionError(
+            f"{elected} is the backup leader; use --takeover to transfer leadership"
+        )
+    if elected != hostname:
+        _atomic_bytes(
+            _leader_path(configuration),
+            (
+                json.dumps(
+                    {"hostname": hostname, "elected_at": _timestamp()},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode(),
+        )
+    return hostname
+
+
 def default_configuration() -> Configuration:
     home = Path.home()
     return Configuration(
@@ -58,13 +100,28 @@ def default_configuration() -> Configuration:
 def database_sources(configuration: Configuration) -> List[Source]:
     root = configuration.codex_home
     destination = configuration.destination / "database-snapshots"
-    return [
+    sources = [
         Source("state", root / "state_5.sqlite", destination / "state.sqlite"),
         Source("goals", root / "goals_1.sqlite", destination / "goals.sqlite"),
         Source(
             "memories", root / "memories_1.sqlite", destination / "memories.sqlite"
         ),
+        Source(
+            "notifications",
+            configuration.destination / "review-monitor" / "notifications.sqlite3",
+            destination / "notifications.sqlite",
+        ),
     ]
+    history = root / "thread_history_1.sqlite"
+    snapshot = destination / "thread-history.sqlite"
+    if (
+        history.is_file()
+        or Path(str(history) + "-wal").exists()
+        or Path(str(history) + "-shm").exists()
+        or snapshot.is_file()
+    ):
+        sources.append(Source("thread-history", history, snapshot))
+    return sources
 
 
 def file_sources(configuration: Configuration) -> List[Source]:
@@ -125,22 +182,49 @@ def _source_modified_at(path: Path) -> int:
     return modified
 
 
-def _backup_sqlite(source: Path, destination: Path) -> None:
-    temporary = _temporary_destination(destination)
-    source_uri = "file:" + quote(str(source), safe="/") + "?mode=rw"
+def _backup_sqlite(
+    source: Path,
+    destination: Path,
+    *,
+    read_only_source: bool = False,
+    before_publish: Optional[Callable[[], None]] = None,
+) -> None:
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix="codex-state-backup-", suffix=".sqlite"
+    )
+    os.close(descriptor)
+    os.chmod(temporary_name, 0o600)
+    temporary = Path(temporary_name)
+    source_uri = "file:" + quote(str(source), safe="/")
+    if read_only_source:
+        source_uri += "?mode=ro&immutable=1"
+    else:
+        source_uri += "?mode=rw"
     try:
         with sqlite3.connect(source_uri, uri=True, timeout=5) as original:
             original.execute("PRAGMA query_only = ON")
             with sqlite3.connect(str(temporary), timeout=5) as snapshot:
                 original.backup(snapshot, pages=256, sleep=0.05)
+                snapshot.execute("PRAGMA journal_mode=DELETE")
         os.chmod(temporary, 0o600)
+        if before_publish is not None:
+            before_publish()
+        for suffix in ("-wal", "-shm", "-journal"):
+            Path(str(destination) + suffix).unlink(missing_ok=True)
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
+        for suffix in ("-wal", "-shm", "-journal"):
+            Path(str(temporary) + suffix).unlink(missing_ok=True)
 
 
 def backup_database(
-    source: Source, configuration: Configuration, now: Optional[float] = None
+    source: Source,
+    configuration: Configuration,
+    now: Optional[float] = None,
+    *,
+    before_publish: Optional[Callable[[], None]] = None,
 ) -> Dict[str, Any]:
     if not source.source.is_file():
         return {"name": source.name, "kind": "database", "status": "missing"}
@@ -168,7 +252,11 @@ def backup_database(
                 "interval_seconds": interval,
             }
 
-    _backup_sqlite(source.source, source.destination)
+    _backup_sqlite(
+        source.source,
+        source.destination,
+        before_publish=before_publish,
+    )
     return {
         "name": source.name,
         "kind": "database",
@@ -177,7 +265,9 @@ def backup_database(
     }
 
 
-def backup_file(source: Source) -> Dict[str, Any]:
+def backup_file(
+    source: Source, *, before_publish: Optional[Callable[[], None]] = None
+) -> Dict[str, Any]:
     if not source.source.is_file() or source.source.is_symlink():
         return {"name": source.name, "kind": "file", "status": "missing"}
     original = source.source.stat()
@@ -194,6 +284,8 @@ def backup_file(source: Source) -> Dict[str, Any]:
         shutil.copyfile(source.source, temporary)
         os.chmod(temporary, 0o600)
         os.utime(temporary, ns=(original.st_atime_ns, original.st_mtime_ns))
+        if before_publish is not None:
+            before_publish()
         os.replace(temporary, source.destination)
     finally:
         temporary.unlink(missing_ok=True)
@@ -205,34 +297,25 @@ def backup_file(source: Source) -> Dict[str, Any]:
     }
 
 
-def network_sources(configuration: Configuration) -> List[Source]:
-    directory = configuration.destination / "network-monitor"
-    if not directory.is_dir():
-        return []
-
-    results: List[Source] = []
-    for candidate in sorted(directory.iterdir()):
-        if candidate.name != "status.json" and not NETWORK_EVENT.fullmatch(
-            candidate.name
-        ):
-            continue
-        if candidate.is_symlink() or not candidate.is_file():
-            continue
-        results.append(
-            Source(
-                "network/" + candidate.name,
-                candidate,
-                configuration.destination / "network-monitor" / candidate.name,
-            )
-        )
-    return results
-
-
 def run_backup(configuration: Configuration) -> Dict[str, Any]:
+    elected = _leader(configuration)
+    if elected != socket.gethostname():
+        return {
+            "observed_at": _timestamp(),
+            "status": "not_leader",
+            "leader": elected,
+            "hostname": socket.gethostname(),
+        }
+
+    def before_publish() -> None:
+        _require_leader(configuration)
+
     results: List[Dict[str, Any]] = []
     for source in database_sources(configuration):
         try:
-            results.append(backup_database(source, configuration))
+            results.append(
+                backup_database(source, configuration, before_publish=before_publish)
+            )
         except (OSError, sqlite3.Error, ValueError) as error:
             result: Dict[str, Any] = {
                 "name": source.name,
@@ -249,9 +332,9 @@ def run_backup(configuration: Configuration) -> Dict[str, Any]:
                     result["sqlite_errorname"] = sqlite_errorname
             results.append(result)
 
-    for source in file_sources(configuration) + network_sources(configuration):
+    for source in file_sources(configuration):
         try:
-            results.append(backup_file(source))
+            results.append(backup_file(source, before_publish=before_publish))
         except (OSError, ValueError) as error:
             results.append(
                 {
@@ -278,6 +361,7 @@ def run_backup(configuration: Configuration) -> Dict[str, Any]:
         ),
         "sources": results,
     }
+    before_publish()
     _atomic_bytes(
         configuration.destination / "backup-status.json",
         (json.dumps(status, sort_keys=True, separators=(",", ":")) + "\n").encode(),
@@ -285,20 +369,96 @@ def run_backup(configuration: Configuration) -> Dict[str, Any]:
     return status
 
 
-def restore_missing(configuration: Configuration) -> Dict[str, Any]:
+def _thread_count(path: Path, *, immutable: bool) -> int:
+    source_uri = "file:" + quote(str(path), safe="/") + "?mode=ro"
+    if immutable:
+        source_uri += "&immutable=1"
+    with sqlite3.connect(source_uri, uri=True, timeout=5) as database:
+        result = database.execute("SELECT COUNT(*) FROM threads").fetchone()
+    if result is None or not isinstance(result[0], int):
+        raise ValueError("state thread count is invalid")
+    return result[0]
+
+
+def _has_open_database_handles(path: Path) -> bool:
+    candidates = [
+        str(candidate)
+        for candidate in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm"))
+        if candidate.exists()
+    ]
+    result = subprocess.run(
+        ["/usr/sbin/lsof", "-t", "--", *candidates],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.stdout.strip():
+        return True
+    if result.returncode == 1 and not result.stderr.strip():
+        return False
+    raise RuntimeError("could not establish whether the state database is open")
+
+
+def restore_missing(
+    configuration: Configuration, *, repair_empty: bool = False
+) -> Dict[str, Any]:
     results: List[Dict[str, Any]] = []
     for source in database_sources(configuration):
         wal = Path(str(source.source) + "-wal")
         shared_memory = Path(str(source.source) + "-shm")
         if source.source.exists() or wal.exists() or shared_memory.exists():
-            results.append({"name": source.name, "status": "existing"})
-            continue
+            if not (repair_empty and source.name == "state" and source.source.exists()):
+                results.append({"name": source.name, "status": "existing"})
+                continue
+            try:
+                if _thread_count(source.source, immutable=False) != 0:
+                    results.append({"name": source.name, "status": "existing"})
+                    continue
+            except (OSError, sqlite3.Error, ValueError) as error:
+                results.append(
+                    {
+                        "name": source.name,
+                        "status": "error",
+                        "error_type": type(error).__name__,
+                    }
+                )
+                continue
         if not source.destination.is_file() or source.destination.is_symlink():
             results.append({"name": source.name, "status": "missing_snapshot"})
             continue
         try:
-            _backup_sqlite(source.destination, source.source)
-        except (OSError, sqlite3.Error, ValueError) as error:
+            repairing = repair_empty and source.name == "state" and source.source.exists()
+            if source.name == "state" and (
+                repairing or _has_sessions(configuration)
+            ):
+                if _thread_count(source.destination, immutable=True) == 0:
+                    results.append(
+                        {
+                            "name": source.name,
+                            "status": "invalid_snapshot",
+                            "reason": "empty_thread_index",
+                        }
+                    )
+                    continue
+
+            before_publish: Optional[Callable[[], None]] = None
+            if repairing:
+                if _has_open_database_handles(source.source):
+                    results.append({"name": source.name, "status": "in_use"})
+                    continue
+
+                def before_publish() -> None:
+                    if _has_open_database_handles(source.source):
+                        raise PermissionError("state database became active during repair")
+
+            _backup_sqlite(
+                source.destination,
+                source.source,
+                read_only_source=True,
+                before_publish=before_publish,
+            )
+        except (OSError, RuntimeError, sqlite3.Error, ValueError) as error:
             results.append(
                 {
                     "name": source.name,
@@ -307,20 +467,74 @@ def restore_missing(configuration: Configuration) -> Dict[str, Any]:
                 }
             )
             continue
-        results.append({"name": source.name, "status": "restored"})
+        results.append(
+            {
+                "name": source.name,
+                "status": "repaired" if repairing else "restored",
+            }
+        )
 
     return {
         "observed_at": _timestamp(),
         "status": (
-            "error" if any(result["status"] == "error" for result in results) else "ok"
+            "error"
+            if any(
+                result["status"] in {"error", "invalid_snapshot", "in_use"}
+                for result in results
+            )
+            else "ok"
         ),
         "sources": results,
     }
 
 
-def install() -> Dict[str, Any]:
+def _has_sessions(configuration: Configuration) -> bool:
+    directory = configuration.codex_home / "sessions"
+    if not directory.is_dir():
+        return False
+    with os.scandir(directory) as entries:
+        return next(entries, None) is not None
+
+
+def stop() -> Dict[str, Any]:
+    service = "gui/" + str(os.getuid())
+    identity = service + "/" + LABEL
+    probe = subprocess.run(
+        ["/bin/launchctl", "print", identity],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if probe.returncode == 0:
+        stopped = subprocess.run(
+            ["/bin/launchctl", "bootout", identity],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if stopped.returncode != 0:
+            raise RuntimeError("existing backup LaunchAgent could not be stopped")
+    destination = Path.home() / "Library" / "LaunchAgents" / (LABEL + ".plist")
+    destination.unlink(missing_ok=True)
+    return {"status": "follower", "label": LABEL, "service": identity}
+
+
+def install(
+    configuration: Optional[Configuration] = None,
+    *,
+    role: Optional[str] = None,
+    takeover: bool = False,
+) -> Dict[str, Any]:
+    configuration = default_configuration() if configuration is None else configuration
+    if role == "follower":
+        return stop()
+    if role == "leader":
+        _elect_leader(configuration, takeover=takeover)
+    elif _leader(configuration) != socket.gethostname():
+        return stop()
+
     script = Path(__file__).resolve()
-    configuration: Dict[str, Any] = {
+    agent: Dict[str, Any] = {
         "Label": LABEL,
         "ProgramArguments": ["/usr/bin/python3", str(script), "run"],
         "WorkingDirectory": str(script.parent),
@@ -330,7 +544,7 @@ def install() -> Dict[str, Any]:
         "StandardOutPath": "/dev/null",
         "StandardErrorPath": "/dev/null",
     }
-    encoded = plistlib.dumps(configuration, sort_keys=True)
+    encoded = plistlib.dumps(agent, sort_keys=True)
 
     destination = Path.home() / "Library" / "LaunchAgents" / (LABEL + ".plist")
     unchanged = destination.is_file() and destination.read_bytes() == encoded
@@ -346,7 +560,12 @@ def install() -> Dict[str, Any]:
         stderr=subprocess.DEVNULL,
     )
     if probe.returncode == 0 and unchanged:
-        return {"status": "already_running", "label": LABEL, "service": identity}
+        return {
+            "status": "already_running",
+            "label": LABEL,
+            "service": identity,
+            "role": "leader",
+        }
     if probe.returncode == 0:
         stopped = subprocess.run(
             ["/bin/launchctl", "bootout", identity],
@@ -373,7 +592,12 @@ def install() -> Dict[str, Any]:
     )
     if verified.returncode != 0:
         raise RuntimeError("backup LaunchAgent started but could not be verified")
-    return {"status": "installed", "label": LABEL, "service": identity}
+    return {
+        "status": "installed",
+        "label": LABEL,
+        "service": identity,
+        "role": "leader",
+    }
 
 
 def read_status(configuration: Configuration) -> Dict[str, Any]:
@@ -392,24 +616,48 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("run", help="run one allowlisted backup")
     commands.add_parser("status", help="read the last backup result")
-    commands.add_parser("install", help="install the scheduled user LaunchAgent")
+    election = commands.add_parser("elect", help="elect a shared backup leader")
+    election.add_argument("--leader", action="store_true", required=True)
+    election.add_argument("--takeover", action="store_true")
+    commands.add_parser("stop", help="stop the local backup writer")
+    install_parser = commands.add_parser(
+        "install", help="install a leader writer or disable a follower writer"
+    )
+    roles = install_parser.add_mutually_exclusive_group()
+    roles.add_argument("--leader", action="store_true")
+    roles.add_argument("--follower", action="store_true")
+    install_parser.add_argument("--takeover", action="store_true")
     restore = commands.add_parser("restore", help="restore absent databases only")
     restore.add_argument("--missing", action="store_true", required=True)
+    restore.add_argument(
+        "--repair-empty",
+        action="store_true",
+        help="replace an unused zero-thread state database with a nonempty snapshot",
+    )
     args = parser.parse_args(argv)
     configuration = default_configuration()
     if args.command == "run":
         result = run_backup(configuration)
     elif args.command == "status":
         result = read_status(configuration)
+    elif args.command == "elect":
+        hostname = _elect_leader(configuration, takeover=args.takeover)
+        result = {"status": "elected", "role": "leader", "hostname": hostname}
+    elif args.command == "stop":
+        result = stop()
+        result["status"] = "stopped"
     elif args.command == "restore":
-        result = restore_missing(configuration)
+        result = restore_missing(configuration, repair_empty=args.repair_empty)
     elif args.command == "install":
-        result = install()
+        if args.takeover and not args.leader:
+            parser.error("--takeover requires --leader")
+        role = "leader" if args.leader else "follower" if args.follower else None
+        result = install(configuration, role=role, takeover=args.takeover)
     else:
         parser.print_help()
         return 2
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
-    return 1 if result["status"] in {"error", "not_started"} else 0
+    return 1 if result["status"] in {"error", "not_started", "not_leader"} else 0
 
 
 if __name__ == "__main__":

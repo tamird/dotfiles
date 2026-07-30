@@ -11,7 +11,7 @@ from pathlib import Path
 import sqlite3
 from typing import cast
 
-from .config import DEFAULT_MAXIMUM_SOURCE_AGE_SECONDS
+from .config import DEFAULT_MAXIMUM_SOURCE_AGE_SECONDS, require_writer_leadership
 from .model import (
     MINIMUM_OVERLAP_SECONDS,
     bounded_limit,
@@ -93,11 +93,18 @@ _TABLES = ("sources", "notifications", "claims", "receipts", "metadata")
 class Store:
     """Own exactly one canonical, explicitly initialized notification cache."""
 
-    def __init__(self, database: Path, *, initialize: bool = False) -> None:
+    def __init__(
+        self, database: Path, *, initialize: bool = False, read_only: bool = False
+    ) -> None:
+        if initialize and read_only:
+            raise ValueError("a read-only notification database cannot be initialized")
         if initialize and database.exists():
             raise ValueError("refusing to initialize an existing database")
         if not initialize and not database.is_file():
             raise ValueError("notification database must be explicitly initialized")
+
+        if not read_only:
+            require_writer_leadership(database)
 
         if initialize:
             descriptor = os.open(
@@ -105,7 +112,11 @@ class Store:
             )
             os.close(descriptor)
 
-        self.connection = sqlite3.connect(str(database), isolation_level=None)
+        self.connection = sqlite3.connect(
+            "file:" + str(database) + "?mode=ro" if read_only else str(database),
+            isolation_level=None,
+            uri=read_only,
+        )
         self.connection.row_factory = sqlite3.Row
         _ = self.connection.execute("PRAGMA busy_timeout = 5000")
         _ = self.connection.execute("PRAGMA foreign_keys = ON")

@@ -129,7 +129,11 @@ def main(argv: list[str] | None = None) -> int:
         print(compact_json(submit_receipts(database, _input())))
         return 0
 
-    with Store(database, initialize=command in {"init", "bootstrap"}) as store:
+    with Store(
+        database,
+        initialize=command in {"init", "bootstrap"},
+        read_only=command in {"health", "pending", "stats", "replay"},
+    ) as store:
         result: object
         if command == "init":
             result = {"initialized": True}

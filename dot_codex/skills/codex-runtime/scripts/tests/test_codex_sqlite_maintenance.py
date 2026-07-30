@@ -12,6 +12,8 @@ import unittest
 from collections.abc import Callable
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from threading import Timer
+from types import SimpleNamespace
 from typing import Literal, Protocol, TextIO, final, runtime_checkable
 from unittest.mock import patch
 
@@ -45,8 +47,11 @@ class CheckpointResult(Protocol):
 
 @runtime_checkable
 class Maintenance(Protocol):
+    BUSY_RETRY_DELAY_SECONDS: float
+    BUSY_TIMEOUT_SECONDS: float
     CHUNK_PAGES: int
     MAX_SECONDS: int
+    MAX_BUSY_RETRIES: int
     STALL_BATCHES: int
 
     def pragma(self, connection: sqlite3.Connection, name: str) -> int: ...
@@ -186,7 +191,12 @@ class SQLiteMaintenanceTests(unittest.TestCase):
             before = maintenance.pragma(blocker, "freelist_count")
             _ = blocker.execute("BEGIN IMMEDIATE")
 
-            with contextlib.redirect_stderr(io.StringIO()):
+            with (
+                patch.object(maintenance, "MAX_BUSY_RETRIES", 2),
+                patch.object(maintenance, "BUSY_RETRY_DELAY_SECONDS", 0),
+                patch.object(maintenance, "BUSY_TIMEOUT_SECONDS", 0.01),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
                 result = maintenance.compact(
                     self.database,
                     target_free_bytes=1,
@@ -198,6 +208,29 @@ class SQLiteMaintenanceTests(unittest.TestCase):
             self.assertEqual(result.reclaimed_bytes, 0)
             self.assertEqual(result.remaining_pages, before)
             blocker.rollback()
+
+    def test_retries_transient_writer_before_reclaiming_free_pages(self) -> None:
+        blocker = sqlite3.connect(str(self.database), check_same_thread=False)
+        self.addCleanup(blocker.close)
+        _ = blocker.execute("BEGIN IMMEDIATE")
+        release = Timer(0.04, blocker.rollback)
+        release.start()
+        self.addCleanup(release.join)
+
+        with (
+            patch.object(maintenance, "BUSY_TIMEOUT_SECONDS", 0.01),
+            patch.object(maintenance, "BUSY_RETRY_DELAY_SECONDS", 0.005),
+        ):
+            result = maintenance.compact(
+                self.database,
+                target_free_bytes=1,
+                free_space=no_free_space,
+                output=io.StringIO(),
+            )
+
+        self.assertEqual(result.status, "exhausted")
+        self.assertGreater(result.reclaimed_bytes, 0)
+        self.assertEqual(result.remaining_pages, 0)
 
     def test_stops_when_reclaimed_pages_do_not_free_disk_space(self) -> None:
         with sqlite3.connect(str(self.database)) as connection:
@@ -378,6 +411,39 @@ class SQLiteMaintenanceTests(unittest.TestCase):
         with patch.object(maintenance, "compact") as compact:
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(maintenance.main(["unexpected"]), 2)
+        compact.assert_not_called()
+
+    def test_main_preserves_default_fifty_gib_target(self) -> None:
+        result = SimpleNamespace(
+            status="target", reclaimed_bytes=0, remaining_pages=0, batches=0
+        )
+        with patch.object(maintenance, "compact", return_value=result) as compact:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(maintenance.main([]), 0)
+
+        compact.assert_called_once_with(
+            Path.home() / ".codex" / "logs_2.sqlite",
+            target_free_bytes=50 * 1024**3,
+        )
+
+    def test_main_accepts_explicit_free_space_target(self) -> None:
+        result = SimpleNamespace(
+            status="target", reclaimed_bytes=0, remaining_pages=0, batches=0
+        )
+        with patch.object(maintenance, "compact", return_value=result) as compact:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(maintenance.main(["--target-free-gib", "70"]), 0)
+
+        compact.assert_called_once_with(
+            Path.home() / ".codex" / "logs_2.sqlite",
+            target_free_bytes=70 * 1024**3,
+        )
+
+    def test_main_rejects_nonpositive_free_space_target(self) -> None:
+        with patch.object(maintenance, "compact") as compact:
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(maintenance.main(["--target-free-gib", "0"]), 2)
+
         compact.assert_not_called()
 
     def test_help_never_opens_or_compacts_database(self) -> None:

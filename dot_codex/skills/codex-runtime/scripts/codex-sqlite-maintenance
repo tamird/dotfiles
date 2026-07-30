@@ -19,6 +19,8 @@ GIB = 1024**3
 TARGET_FREE_BYTES = 50 * GIB
 CHUNK_PAGES = 1024
 BUSY_TIMEOUT_SECONDS = 0.25
+MAX_BUSY_RETRIES = 12
+BUSY_RETRY_DELAY_SECONDS = 0.05
 MAX_SECONDS = 30 * 60
 PROGRESS_INTERVAL = 16
 STALL_BATCHES = 32
@@ -126,6 +128,7 @@ def compact(
                 flush=True,
             )
 
+            busy_retries = 0
             while remaining_pages and best_free_bytes < target_free_bytes:
                 if clock() >= deadline:
                     return Result(
@@ -133,9 +136,33 @@ def compact(
                     )
 
                 previous_pages = remaining_pages
-                _ = connection.execute(
-                    "PRAGMA incremental_vacuum(" + str(CHUNK_PAGES) + ")"
-                ).fetchall()
+                try:
+                    _ = connection.execute(
+                        "PRAGMA incremental_vacuum(" + str(CHUNK_PAGES) + ")"
+                    ).fetchall()
+                except sqlite3.OperationalError as error:
+                    message = str(error).lower()
+                    if "locked" not in message and "busy" not in message:
+                        raise
+                    busy_retries += 1
+                    if busy_retries > MAX_BUSY_RETRIES:
+                        raise
+                    remaining_time = deadline - clock()
+                    if remaining_time <= 0:
+                        return Result(
+                            "timeout",
+                            reclaimed_pages * page_size,
+                            remaining_pages,
+                            batches,
+                        )
+                    time.sleep(
+                        min(
+                            BUSY_RETRY_DELAY_SECONDS * 2 ** min(busy_retries - 1, 4),
+                            remaining_time,
+                        )
+                    )
+                    continue
+                busy_retries = 0
                 remaining_pages = pragma(connection, "freelist_count")
                 batches += 1
                 removed_pages = max(previous_pages - remaining_pages, 0)
@@ -212,13 +239,25 @@ def compact(
 
 def main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    _ = parser.add_argument(
+        "--target-free-gib",
+        type=int,
+        default=TARGET_FREE_BYTES // GIB,
+        help="stop after this many GiB of filesystem space are available",
+    )
     try:
-        parser.parse_args(arguments)
+        options = parser.parse_args(arguments)
+        target_free_gib: object = vars(options).get("target_free_gib")
+        if not isinstance(target_free_gib, int) or target_free_gib <= 0:
+            parser.error("--target-free-gib must be positive")
     except SystemExit as error:
         return 0 if error.code == 0 else 2
 
     try:
-        result = compact(Path.home() / ".codex" / "logs_2.sqlite")
+        result = compact(
+            Path.home() / ".codex" / "logs_2.sqlite",
+            target_free_bytes=target_free_gib * GIB,
+        )
     except KeyboardInterrupt:
         print("Codex log maintenance interrupted safely", file=sys.stderr, flush=True)
         return 130

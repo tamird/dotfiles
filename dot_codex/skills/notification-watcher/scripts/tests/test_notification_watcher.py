@@ -179,6 +179,36 @@ class NotificationWatcherTest(unittest.TestCase):
             ["claims", "metadata", "notifications", "receipts", "sources"],
         )
 
+    def test_overlapping_sources_keep_evidence_but_share_one_review_claim(
+        self,
+    ) -> None:
+        self.register("source-a")
+        self.register("source-b")
+        event = self.event(logical_cycle_id="one-provider-message")
+
+        first = ingest(self.store, self.observation(events=[event]))
+        second = ingest(
+            self.store,
+            self.observation(source_id="source-b", events=[event]),
+        )
+
+        self.assertEqual(first["discovered"], 1)
+        self.assertEqual(second["discovered"], 1)
+        self.assertEqual(len(self.store.pending()), 1)
+        rows = self.store.connection.execute(
+            "SELECT source_id FROM notifications "
+            "WHERE logical_cycle_id = ? ORDER BY source_id",
+            ("one-provider-message",),
+        )
+        self.assertEqual([row["source_id"] for row in rows], ["source-a", "source-b"])
+        checkpoints = self.store.connection.execute(
+            "SELECT source_id, pagination_complete FROM sources ORDER BY source_id"
+        )
+        self.assertEqual(
+            [(row["source_id"], row["pagination_complete"]) for row in checkpoints],
+            [("source-a", 1), ("source-b", 1)],
+        )
+
     def test_notification_database_is_owner_private(self) -> None:
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
 

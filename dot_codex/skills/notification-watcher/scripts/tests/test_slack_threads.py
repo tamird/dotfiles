@@ -64,6 +64,40 @@ class SlackThreadIntakeTest(unittest.TestCase):
             result, ("slack:previously-unlisted-channel:1785231510.122969",)
         )
 
+    def test_discovers_old_control_roots_from_current_principal_replies(self) -> None:
+        channel = "C0BJWK4DPDY"
+        principal = "U01OWNER"
+        messages = self.page(
+            [
+                {
+                    "channel": channel,
+                    "user": principal,
+                    "ts": "1785425356.719229",
+                    "thread_ts": "1785422677.684279",
+                },
+                {
+                    "channel": channel,
+                    "user": principal,
+                    "ts": "1785432259.446409",
+                    "thread_ts": "1785421919.024249",
+                },
+                {
+                    "channel": channel,
+                    "user": "U02OTHER",
+                    "ts": "1785432260.446409",
+                    "thread_ts": "1785432000.000000",
+                },
+            ]
+        )
+
+        self.assertEqual(
+            discover_owned_thread_scopes(messages, principal=principal),
+            (
+                "slack:C0BJWK4DPDY:1785421919.024249",
+                "slack:C0BJWK4DPDY:1785422677.684279",
+            ),
+        )
+
     def test_watched_top_level_review_request_requires_no_mention(self) -> None:
         message = {
             "user": "actual-human",
@@ -723,6 +757,239 @@ class SlackThreadIntakeTest(unittest.TestCase):
             [records[0]["events"][0]["event_id"]],
         )
         self.assertEqual(records[1]["events"][0]["category"], "control_task")
+
+    def test_control_source_classifies_principal_replies_in_existing_threads(
+        self,
+    ) -> None:
+        channel = "C0BJWK4DPDY"
+        principal = "U01OWNER"
+        examples = (
+            ("1785422677.684279", "1785425356.719229"),
+            ("1785421919.024249", "1785432259.446409"),
+        )
+
+        for root, reply in examples:
+            with self.subTest(root=root, reply=reply):
+                result = classify_slack_pages(
+                    {
+                        "principal": principal,
+                        "items": [
+                            {
+                                "source_id": "slack_user_work_log_tasks",
+                                "kind": "thread",
+                                "channel": channel,
+                                "root": root,
+                                "provider_page": {
+                                    "messages": (
+                                        "=== THREAD PARENT MESSAGE ===\n"
+                                        "From: Principal (U01OWNER)\n"
+                                        f"Message TS: {root}\n"
+                                        "Please investigate the original issue.\n\n"
+                                        "=== THREAD REPLY 1 ===\n"
+                                        "From: Principal (U01OWNER)\n"
+                                        f"Message TS: {reply}\n"
+                                        "Please also investigate this follow-up.\n"
+                                    ),
+                                    "pagination_info": (
+                                        "There are no more messages in this thread."
+                                    ),
+                                },
+                            }
+                        ],
+                    }
+                )
+
+                records = result["results"]
+                self.assertIsInstance(records, list)
+                assert isinstance(records, list)
+                events = records[0]["events"]
+                self.assertEqual(len(events), 2)
+                self.assertEqual(events[1]["category"], "control_task")
+                self.assertEqual(
+                    events[1]["event_id"], f"slack:{channel}:{root}:{reply}"
+                )
+                self.assertEqual(events[1]["actor"], principal)
+
+    def test_noncontrol_source_cannot_promote_messages_into_user_tasks(self) -> None:
+        item = self.provider_item(
+            kind="control",
+            source_id="slack_monitored_channels",
+            actor="U01OWNER",
+        )
+
+        with self.assertRaisesRegex(ValueError, "authenticated control source"):
+            _ = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+    def test_dedicated_review_channel_recognizes_plain_human_pull_request(
+        self,
+    ) -> None:
+        channel = "C0BLVQDSKUG"
+        timestamp = "1785431825.473329"
+        item: dict[str, object] = {
+            "source_id": "slack_eng_acceleration_reviews",
+            "kind": "thread",
+            "channel": channel,
+            "root": timestamp,
+            "provider_page": {
+                "messages": [
+                    {
+                        "channel": channel,
+                        "user": "U02REVIEWER",
+                        "ts": timestamp,
+                        "text": (
+                            "cleanup some ci worker terraform, should be noop "
+                            "https://github.com/openai/openai/pull/1210236"
+                        ),
+                    }
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+            "subject_heads": {"openai/openai#1210236": self.head},
+        }
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        assert isinstance(records, list)
+        event = records[0]["events"][0]
+        self.assertEqual(event["category"], "review_request")
+        self.assertEqual(event["reviewer"], "U01OWNER")
+        self.assertEqual(event["subject_key"], "openai/openai#1210236")
+        self.assertEqual(
+            event["event_id"], f"slack:{channel}:{timestamp}:{timestamp}"
+        )
+
+    def test_plain_pull_request_outside_review_channel_is_owned_feedback(
+        self,
+    ) -> None:
+        item = self.provider_item(
+            text="cleanup https://github.com/example/repository/pull/42"
+        )
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        assert isinstance(records, list)
+        self.assertEqual(records[0]["events"][0]["category"], "owned_feedback")
+
+    def test_review_channel_keeps_same_category_across_overlapping_sources(
+        self,
+    ) -> None:
+        channel = "C0BLVQDSKUG"
+        timestamp = "1785431825.473329"
+        item: dict[str, object] = {
+            "source_id": "slack_monitored_channels",
+            "kind": "thread",
+            "channel": channel,
+            "root": timestamp,
+            "review_channel": True,
+            "provider_page": {
+                "messages": [
+                    {
+                        "channel": channel,
+                        "user": "U02REVIEWER",
+                        "ts": timestamp,
+                        "text": (
+                            "cleanup some ci worker terraform, should be noop "
+                            "https://github.com/openai/openai/pull/1210236"
+                        ),
+                    }
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+            "subject_heads": {"openai/openai#1210236": self.head},
+        }
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        assert isinstance(records, list)
+        event = records[0]["events"][0]
+        self.assertEqual(event["category"], "review_request")
+        self.assertEqual(event["reviewer"], "U01OWNER")
+        self.assertEqual(event["event_id"], f"slack:{channel}:{timestamp}:{timestamp}")
+
+    def test_review_channel_preserves_each_pull_request_in_one_message(self) -> None:
+        channel = "C0643PZFT5E"
+        timestamp = "1785437240.749679"
+        item: dict[str, object] = {
+            "source_id": "slack_monitored_channels",
+            "kind": "thread",
+            "channel": channel,
+            "root": timestamp,
+            "review_channel": True,
+            "provider_page": {
+                "messages": [
+                    {
+                        "channel": channel,
+                        "user": "U02REVIEWER",
+                        "ts": timestamp,
+                        "text": (
+                            "some easy reviews: "
+                            "https://github.com/openai/openai/pull/1207484 "
+                            "https://github.com/openai/openai/pull/1207597"
+                        ),
+                    }
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+            "subject_heads": {
+                "openai/openai#1207484": self.head,
+                "openai/openai#1207597": "b" * 40,
+            },
+        }
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        assert isinstance(records, list)
+        events = records[0]["events"]
+        self.assertEqual(
+            [(event["subject_key"], event["category"]) for event in events],
+            [
+                ("openai/openai#1207484", "review_request"),
+                ("openai/openai#1207597", "review_request"),
+            ],
+        )
+        self.assertEqual(
+            [event["event_id"] for event in events],
+            [
+                f"slack:{channel}:{timestamp}:{timestamp}",
+                f"slack:{channel}:{timestamp}:{timestamp}:openai/openai#1207597",
+            ],
+        )
+
+    def test_review_channel_still_rejects_unauthenticated_bot_requests(self) -> None:
+        item: dict[str, object] = {
+            "source_id": "slack_eng_acceleration_reviews",
+            "kind": "thread",
+            "channel": "C0BLVQDSKUG",
+            "root": "1785431825.473329",
+            "provider_page": {
+                "messages": [
+                    {
+                        "channel": "C0BLVQDSKUG",
+                        "user": "U02BOT",
+                        "actor_is_bot": True,
+                        "ts": "1785431825.473329",
+                        "text": "https://github.com/openai/openai/pull/1210236",
+                    }
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+            "subject_heads": {"openai/openai#1210236": self.head},
+        }
+
+        result = classify_slack_pages({"principal": "U01OWNER", "items": [item]})
+
+        records = result["results"]
+        self.assertIsInstance(records, list)
+        assert isinstance(records, list)
+        self.assertEqual(records[0]["events"], [])
 
     def test_batched_classifier_rejects_unauthenticated_truncated_head(self) -> None:
         item = self.provider_item()

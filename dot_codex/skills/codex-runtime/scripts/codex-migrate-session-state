@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Move complete Codex session stores into shared storage without copying them."""
+
+from __future__ import annotations
+
+import argparse
+from collections.abc import Sequence
+import filecmp
+import json
+import os
+from pathlib import Path
+import runpy
+import shutil
+import socket
+from typing import Callable, cast
+
+
+SESSION_STATE = (
+    "rotated_rollout_segments",
+    "archived_sessions",
+    "attachments",
+    "session_index.jsonl",
+)
+_exchange = cast(
+    Callable[[Path, Path], None],
+    runpy.run_path(str(Path(__file__).with_name("codex-migrate-memories")))["exchange"],
+)
+
+
+def _verify_file(source: Path, target: Path) -> int:
+    if target.is_symlink() or not target.is_file() or not source.is_file():
+        raise ValueError("shared session file is absent from the local store")
+    size = target.stat().st_size
+    if size != source.stat().st_size:
+        raise ValueError("shared session file differs from the local store")
+    if not filecmp.cmp(source, target, shallow=False):
+        raise ValueError("shared session file differs from the local store")
+    return size
+
+
+def _verify_subset(source: Path, target: Path) -> tuple[int, int]:
+    if not target.exists():
+        return 0, 0
+    if source.is_file():
+        return 1, _verify_file(source, target)
+    if target.is_symlink() or not target.is_dir():
+        raise ValueError("shared session store is not a real directory: " + str(target))
+    count = 0
+    size = 0
+    for parent, directories, filenames in os.walk(target):
+        for name in directories:
+            if Path(parent, name).is_symlink():
+                raise ValueError("shared session store contains a symbolic link")
+        for name in filenames:
+            existing = Path(parent, name)
+            original = source / existing.relative_to(target)
+            size += _verify_file(original, existing)
+            count += 1
+    return count, size
+
+
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _require_leader(shared_root: Path) -> None:
+    with (shared_root / "runtime" / "backup-leader.json").open(
+        encoding="utf-8"
+    ) as source:
+        record = cast(object, json.load(source))
+    if not isinstance(record, dict):
+        raise ValueError("backup leader record is invalid")
+    leader = cast(dict[str, object], record).get("hostname")
+    if leader != socket.gethostname():
+        raise PermissionError(
+            "only the elected backup leader may migrate session state"
+        )
+
+
+def migrate_path(source: Path, target: Path, *, dry_run: bool) -> dict[str, object]:
+    if source.is_symlink():
+        if not target.exists() or source.resolve() != target.resolve():
+            raise ValueError("local session store points to another destination")
+        return {"directory": source.name, "status": "linked"}
+    if not source.is_dir() and not source.is_file():
+        raise ValueError("local session store does not exist: " + str(source))
+    if source.stat().st_dev != target.parent.stat().st_dev:
+        raise ValueError("session stores are on different filesystems")
+    count, size = _verify_subset(source, target)
+    if dry_run:
+        return {
+            "directory": source.name,
+            "status": "ready",
+            "duplicate_files": count,
+            "duplicate_bytes": size,
+        }
+
+    previous = target.parent / ("." + target.name + ".pre-migration")
+    if previous.exists() or previous.is_symlink():
+        raise ValueError("previous migration backup already exists: " + str(previous))
+    original_inode = source.stat().st_ino
+    moved_previous = False
+    exchanged = False
+    try:
+        if target.exists():
+            _ = target.rename(previous)
+            moved_previous = True
+            _sync_directory(target.parent)
+        os.symlink(target, target)
+        _sync_directory(target.parent)
+        _exchange(source, target)
+        exchanged = True
+        _sync_directory(source.parent)
+        _sync_directory(target.parent)
+        if not source.is_symlink() or source.resolve() != target.resolve():
+            raise RuntimeError("atomic migration did not retain the local session path")
+        if target.stat().st_ino != original_inode:
+            raise RuntimeError(
+                "atomic migration did not retain the original session directory"
+            )
+        if moved_previous:
+            _ = _verify_subset(target, previous)
+    except BaseException:
+        if exchanged:
+            _exchange(source, target)
+        if target.is_symlink():
+            target.unlink(missing_ok=True)
+        if moved_previous and previous.exists() and not target.exists():
+            _ = previous.rename(target)
+        _sync_directory(source.parent)
+        _sync_directory(target.parent)
+        raise
+
+    if moved_previous:
+        if previous.is_dir():
+            shutil.rmtree(previous)
+        else:
+            previous.unlink()
+        _sync_directory(target.parent)
+    return {
+        "directory": source.name,
+        "status": "migrated",
+        "removed_duplicate_files": count,
+        "removed_duplicate_bytes": size,
+    }
+
+
+def migrate(codex_home: Path, shared_root: Path, *, dry_run: bool) -> dict[str, object]:
+    if not dry_run:
+        _require_leader(shared_root)
+    return {
+        "status": "dry_run" if dry_run else "completed",
+        "directories": [
+            migrate_path(codex_home / name, shared_root / name, dry_run=dry_run)
+            for name in SESSION_STATE
+        ],
+    }
+
+
+def link_path(source: Path, target: Path) -> dict[str, object]:
+    if not target.exists() or target.is_symlink():
+        raise ValueError("shared session state is unavailable: " + str(target))
+    if source.is_symlink():
+        if source.resolve() != target.resolve():
+            raise ValueError("local session store points to another destination")
+        return {"directory": source.name, "status": "linked"}
+    if source.is_dir():
+        try:
+            source.rmdir()
+        except OSError as error:
+            raise ValueError(
+                "refusing to replace nonempty local session state"
+            ) from error
+    elif source.is_file():
+        if source.stat().st_size:
+            raise ValueError("refusing to replace nonempty local session state")
+        source.unlink()
+    elif source.exists():
+        raise ValueError("local session state is not a regular file or directory")
+    os.symlink(target, source, target_is_directory=target.is_dir())
+    _sync_directory(source.parent)
+    return {"directory": source.name, "status": "linked"}
+
+
+def link(codex_home: Path, shared_root: Path) -> dict[str, object]:
+    return {
+        "status": "linked",
+        "directories": [
+            link_path(codex_home / name, shared_root / name) for name in SESSION_STATE
+        ],
+    }
+
+
+def main(argv: Sequence[str] = ()) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    modes = parser.add_mutually_exclusive_group()
+    _ = modes.add_argument("--dry-run", action="store_true")
+    _ = modes.add_argument("--link", action="store_true")
+    arguments = parser.parse_args(argv or None)
+    codex_home = Path.home() / ".codex"
+    shared_root = (codex_home / "sessions").resolve().parent
+    result = (
+        link(codex_home, shared_root)
+        if cast(bool, arguments.link)
+        else migrate(codex_home, shared_root, dry_run=cast(bool, arguments.dry_run))
+    )
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

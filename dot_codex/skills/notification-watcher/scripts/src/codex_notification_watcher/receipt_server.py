@@ -11,6 +11,7 @@ import socketserver
 import sqlite3
 from typing import cast
 
+from .config import require_writer_leadership
 from .model import MAXIMUM_LIMIT, compact_json
 from .source import ingest
 from .store import Store
@@ -93,6 +94,7 @@ def socket_path(database: Path) -> Path:
 
 def serve_receipts(database: Path) -> None:
     """Run exactly one owner-private receipt writer until stopped."""
+    require_writer_leadership(database)
     address = socket_path(database)
     if address.exists():
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
@@ -113,6 +115,7 @@ def serve_receipts(database: Path) -> None:
 
 def submit_receipts(database: Path, value: object) -> dict[str, object]:
     """Deliver one actual provider observation to the sole canonical writer."""
+    require_writer_leadership(database)
     if not isinstance(value, list) or not value:
         raise ValueError("provider receipts must be a nonempty JSON array")
     observations = cast(list[object], value)

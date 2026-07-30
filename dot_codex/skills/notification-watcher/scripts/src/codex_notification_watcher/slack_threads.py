@@ -247,6 +247,7 @@ def slack_thread_events(
     principal: str,
     subject_heads: dict[str, str],
     direct: bool = False,
+    review_channel: bool = False,
 ) -> list[dict[str, object]]:
     """Keep genuine human root/reply requests independent of other reactions."""
     source_channel = required_string(channel, description="Slack channel")
@@ -310,7 +311,9 @@ def slack_thread_events(
             _CODEX_MENTION.search(text) is not None and not principal_mentioned
         )
         review_request = not automation_only and (
-            principal_mentioned or _PERSONAL_REVIEW_REQUEST.search(text) is not None
+            principal_mentioned
+            or _PERSONAL_REVIEW_REQUEST.search(text) is not None
+            or (review_channel and found is not None)
         )
         event_id = f"slack:{source_channel}:{source_root}:{timestamp}"
         event: dict[str, object] = {
@@ -331,6 +334,28 @@ def slack_thread_events(
         if review_request:
             event["reviewer"] = owner
         events.append(event)
+        if review_request:
+            seen_subjects = {subject}
+            for match in _PULL_REQUEST.finditer(text):
+                additional_subject = (
+                    f"{match.group('owner')}/{match.group('repository')}"
+                    f"#{match.group('number')}"
+                )
+                if additional_subject in seen_subjects:
+                    continue
+                additional_head = subject_heads.get(additional_subject)
+                if additional_head is None:
+                    raise ValueError(
+                        "Slack pull request lacks its authenticated exact head"
+                    )
+                additional_event = dict(event)
+                additional_event_id = f"{event_id}:{additional_subject}"
+                additional_event["event_id"] = additional_event_id
+                additional_event["logical_cycle_id"] = additional_event_id
+                additional_event["subject_key"] = additional_subject
+                additional_event["head"] = additional_head
+                events.append(additional_event)
+                seen_subjects.add(additional_subject)
     return events
 
 
@@ -372,7 +397,14 @@ def classify_slack_pages(value: object) -> dict[str, object]:
 
         events: list[dict[str, object]]
         owned_scopes: tuple[str, ...] = ()
-        if kind == "thread":
+        control_source = source_id == "slack_user_work_log_tasks"
+        if kind == "control" and not control_source:
+            raise ValueError("Slack user tasks require an authenticated control source")
+        if kind in {"thread", "control"} and control_source:
+            events = slack_control_events(
+                channel=channel, root=root, messages=page, principal=principal
+            )
+        elif kind == "thread":
             events = slack_thread_events(
                 channel=channel,
                 root=root,
@@ -380,10 +412,10 @@ def classify_slack_pages(value: object) -> dict[str, object]:
                 principal=principal,
                 subject_heads=subject_heads,
                 direct=direct,
-            )
-        elif kind == "control":
-            events = slack_control_events(
-                channel=channel, root=root, messages=page, principal=principal
+                review_channel=(
+                    source_id == "slack_eng_acceleration_reviews"
+                    or item.get("review_channel") is True
+                ),
             )
         elif kind == "outbound":
             events = []

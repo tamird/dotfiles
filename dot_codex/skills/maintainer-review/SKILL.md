@@ -76,9 +76,10 @@ incident or initiative.
 ## Review the record and deliver the right verdict
 
 Apply `$change-record-writing` to the actual title and rendered cumulative
-description, including causal reason, primary citations, platform rationale,
-and the repository's real formatting. Never invent an author's rationale or
-edit another person's record without explicit authorization.
+description, including its pull-request title-length limit, causal reason,
+primary citations, platform rationale, and the repository's real formatting.
+Never invent an author's rationale or edit another person's record without
+explicit authorization.
 
 Before approving or disputing a citation, verify the provider's first-party
 raw Markdown `body`, its actual link destination, and the concise supporting

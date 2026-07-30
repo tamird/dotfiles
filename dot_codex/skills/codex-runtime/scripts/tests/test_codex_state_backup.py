@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 import importlib.util
 from importlib.machinery import SourceFileLoader
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -50,6 +52,10 @@ class StateBackupTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.codex_home.mkdir()
 
+    def elect_leader(self, hostname: str = "test-leader") -> None:
+        with patch.object(backup.socket, "gethostname", return_value=hostname):
+            backup._elect_leader(self.configuration)
+
     def test_default_configuration_uses_shared_google_drive(self) -> None:
         home = self.codex_home.parent
         with patch.object(backup.Path, "home", return_value=home):
@@ -84,10 +90,17 @@ class StateBackupTests(unittest.TestCase):
         with sqlite3.connect(
             str(self.destination / "database-snapshots" / "state.sqlite")
         ) as restored:
+            self.assertEqual(restored.execute("PRAGMA journal_mode").fetchone(), ("delete",))
             self.assertEqual(
                 restored.execute("SELECT value FROM records ORDER BY value").fetchall(),
                 [("original",), ("wal-value",)],
             )
+        self.assertFalse(
+            (self.destination / "database-snapshots" / "state.sqlite-wal").exists()
+        )
+        self.assertFalse(
+            (self.destination / "database-snapshots" / "state.sqlite-shm").exists()
+        )
 
     def test_online_backup_bootstraps_missing_wal_sidecars(self) -> None:
         connection = self.create_database("memories_1.sqlite", wal=True)
@@ -203,6 +216,7 @@ class StateBackupTests(unittest.TestCase):
         )
 
     def test_database_failure_records_safe_sqlite_diagnostics(self) -> None:
+        self.elect_leader()
         connection = self.create_database("memories_1.sqlite")
         self.addCleanup(connection.close)
         source = backup.database_sources(self.configuration)[2]
@@ -212,8 +226,9 @@ class StateBackupTests(unittest.TestCase):
             with self.assertRaises(sqlite3.OperationalError) as failure:
                 readonly.execute("INSERT INTO records VALUES ('rejected')")
 
-        with patch.object(backup, "_backup_sqlite", side_effect=failure.exception):
-            result = backup.run_backup(self.configuration)
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            with patch.object(backup, "_backup_sqlite", side_effect=failure.exception):
+                result = backup.run_backup(self.configuration)
 
         memory = next(
             item for item in result["sources"] if item["name"] == "memories"
@@ -229,43 +244,14 @@ class StateBackupTests(unittest.TestCase):
                     self.assertEqual(memory[field], expected)
         self.assertNotIn("error", memory)
 
-    def test_network_allowlist_rejects_proxy_plists_and_credentials(self) -> None:
-        directory = self.destination / "network-monitor"
-        directory.mkdir(parents=True)
-        for name in (
-            "status.json",
-            "events.jsonl",
-            "events.jsonl.1",
-            "events.jsonl.99",
-            "auth.json",
-            "proxy.plist",
-            "events.jsonl.secret",
-            "local.codex.network-monitor.plist",
-        ):
-            (directory / name).write_text("fixture", encoding="utf-8")
-
-        sources = backup.network_sources(self.configuration)
-
-        self.assertEqual(
-            [source.source.name for source in sources],
-            ["events.jsonl", "events.jsonl.1", "events.jsonl.99", "status.json"],
-        )
-
-    def test_network_symlink_is_not_followed(self) -> None:
-        directory = self.destination / "network-monitor"
-        directory.mkdir(parents=True)
-        secret = self.codex_home / "auth.json"
-        secret.write_text("secret", encoding="utf-8")
-        (directory / "status.json").symlink_to(secret)
-
-        self.assertEqual(backup.network_sources(self.configuration), [])
-
     def test_full_run_excludes_credentials_and_large_logs(self) -> None:
+        self.elect_leader()
         for name in ("auth.json", "config.toml", "logs_2.sqlite"):
             (self.codex_home / name).write_text("must-not-copy", encoding="utf-8")
         (self.codex_home / "history.jsonl").write_text("history\n", encoding="utf-8")
 
-        result = backup.run_backup(self.configuration)
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            result = backup.run_backup(self.configuration)
 
         self.assertEqual(result["status"], "error")
         self.assertEqual(
@@ -342,15 +328,69 @@ class StateBackupTests(unittest.TestCase):
         self.assertEqual(result, {"status": "not_started"})
         self.assertFalse(self.destination.exists())
 
-    def test_replayable_notification_cache_is_not_snapshotted(self) -> None:
+    def test_notification_database_has_transactional_standalone_snapshot(self) -> None:
         sources = backup.database_sources(self.configuration)
+        notification = next(source for source in sources if source.name == "notifications")
+        notification.source.parent.mkdir(parents=True)
+        with sqlite3.connect(str(notification.source)) as database:
+            database.execute("PRAGMA journal_mode=WAL")
+            database.execute("CREATE TABLE receipts(value TEXT NOT NULL)")
+            database.execute("INSERT INTO receipts VALUES ('verified')")
 
+        result = backup.backup_database(notification, self.configuration)
+
+        self.assertEqual(result["status"], "completed")
         self.assertEqual(
-            {source.name for source in sources}, {"state", "goals", "memories"}
+            notification.destination,
+            self.destination / "database-snapshots" / "notifications.sqlite",
         )
-        self.assertFalse(
-            any("review-monitor" in source.source.parts for source in sources)
+        with sqlite3.connect(str(notification.destination)) as restored:
+            self.assertEqual(restored.execute("PRAGMA journal_mode").fetchone(), ("delete",))
+            self.assertEqual(
+                restored.execute("SELECT value FROM receipts").fetchall(),
+                [("verified",)],
+            )
+        self.assertFalse(Path(str(notification.destination) + "-wal").exists())
+        self.assertFalse(Path(str(notification.destination) + "-shm").exists())
+
+    def test_paginated_thread_history_is_backed_up_when_present(self) -> None:
+        connection = self.create_database("thread_history_1.sqlite", wal=True)
+        self.addCleanup(connection.close)
+
+        sources = backup.database_sources(self.configuration)
+        history = next(item for item in sources if item.name == "thread-history")
+        result = backup.backup_database(history, self.configuration)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(history.destination.name, "thread-history.sqlite")
+        with sqlite3.connect(str(history.destination)) as snapshot:
+            self.assertEqual(
+                snapshot.execute("SELECT value FROM records").fetchall(),
+                [("original",)],
+            )
+
+    def test_paginated_thread_history_snapshot_is_restored_when_local_is_missing(
+        self,
+    ) -> None:
+        destination = (
+            self.destination / "database-snapshots" / "thread-history.sqlite"
         )
+        destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(destination)) as snapshot:
+            snapshot.execute("CREATE TABLE records(value TEXT NOT NULL)")
+            snapshot.execute("INSERT INTO records VALUES ('paginated')")
+
+        result = backup.restore_missing(self.configuration)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertIn(
+            {"name": "thread-history", "status": "restored"}, result["sources"]
+        )
+        with sqlite3.connect(str(self.codex_home / "thread_history_1.sqlite")) as local:
+            self.assertEqual(
+                local.execute("SELECT value FROM records").fetchall(),
+                [("paginated",)],
+            )
 
     def test_visible_review_archives_are_not_self_copied(self) -> None:
         source = backup.file_sources(self.configuration)[1]
@@ -365,7 +405,10 @@ class StateBackupTests(unittest.TestCase):
         self.assertEqual(source.source.stat().st_mtime_ns, before)
 
     def test_missing_required_database_degrades_the_backup(self) -> None:
-        result = backup.run_backup(self.configuration)
+        self.elect_leader()
+
+        with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+            result = backup.run_backup(self.configuration)
 
         self.assertEqual(result["status"], "error")
         with (self.destination / "backup-status.json").open(encoding="utf-8") as f:
@@ -386,7 +429,8 @@ class StateBackupTests(unittest.TestCase):
                     subprocess.CompletedProcess([], 0),
                 ],
             ) as launch:
-                result = backup.install()
+                with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+                    result = backup.install(self.configuration, role="leader")
 
         path = (
             self.codex_home
@@ -397,6 +441,7 @@ class StateBackupTests(unittest.TestCase):
         with path.open("rb") as handle:
             configuration = plistlib.load(handle)
         self.assertEqual(result["status"], "installed")
+        self.assertEqual(result["role"], "leader")
         self.assertEqual(configuration["Label"], backup.LABEL)
         self.assertEqual(configuration["StartInterval"], 300)
         self.assertTrue(configuration["RunAtLoad"])
@@ -407,6 +452,264 @@ class StateBackupTests(unittest.TestCase):
         self.assertEqual(configuration["WorkingDirectory"], str(SCRIPT.parent))
         self.assertNotIn("KeepAlive", configuration)
         self.assertEqual(launch.call_count, 3)
+
+    def test_run_without_leader_never_publishes_shared_state(self) -> None:
+        connection = self.create_database("state_5.sqlite")
+        self.addCleanup(connection.close)
+
+        with patch.object(backup.socket, "gethostname", return_value="follower"):
+            result = backup.run_backup(self.configuration)
+
+        self.assertEqual(result["status"], "not_leader")
+        self.assertIsNone(result["leader"])
+        self.assertFalse(self.destination.exists())
+
+    def test_follower_cannot_replace_leader_snapshot(self) -> None:
+        self.elect_leader()
+        connection = self.create_database("state_5.sqlite")
+        self.addCleanup(connection.close)
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        source.destination.write_bytes(b"authoritative snapshot")
+
+        with patch.object(backup.socket, "gethostname", return_value="follower"):
+            result = backup.run_backup(self.configuration)
+
+        self.assertEqual(result["status"], "not_leader")
+        self.assertEqual(result["leader"], "test-leader")
+        self.assertEqual(source.destination.read_bytes(), b"authoritative snapshot")
+        self.assertFalse((self.destination / "backup-status.json").exists())
+
+    def test_publication_rechecks_leadership_after_copy(self) -> None:
+        connection = self.create_database("state_5.sqlite")
+        self.addCleanup(connection.close)
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        source.destination.write_bytes(b"authoritative snapshot")
+
+        def reject_publication() -> None:
+            raise PermissionError
+
+        with self.assertRaises(PermissionError):
+            backup._backup_sqlite(
+                source.source,
+                source.destination,
+                before_publish=reject_publication,
+            )
+
+        self.assertEqual(source.destination.read_bytes(), b"authoritative snapshot")
+
+    def test_electing_different_leader_requires_explicit_takeover(self) -> None:
+        self.elect_leader()
+
+        with patch.object(backup.socket, "gethostname", return_value="other-host"):
+            with self.assertRaises(PermissionError):
+                backup._elect_leader(self.configuration)
+            self.assertEqual(backup._elect_leader(self.configuration, takeover=True), "other-host")
+
+        self.assertEqual(backup._leader(self.configuration), "other-host")
+
+    def test_election_command_does_not_start_a_backup_writer(self) -> None:
+        output = StringIO()
+
+        with patch.object(backup, "default_configuration", return_value=self.configuration):
+            with patch.object(backup.socket, "gethostname", return_value="test-leader"):
+                with patch.object(backup.subprocess, "run") as launch:
+                    with redirect_stdout(output):
+                        result = backup.main(["elect", "--leader"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(backup._leader(self.configuration), "test-leader")
+        self.assertEqual(json.loads(output.getvalue())["status"], "elected")
+        launch.assert_not_called()
+
+    def test_stop_command_does_not_clear_elected_leader(self) -> None:
+        import subprocess
+
+        self.elect_leader()
+        output = StringIO()
+        with patch.object(backup, "default_configuration", return_value=self.configuration):
+            with patch.object(backup.Path, "home", return_value=self.codex_home):
+                with patch.object(
+                    backup.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 1),
+                ):
+                    with redirect_stdout(output):
+                        result = backup.main(["stop"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(json.loads(output.getvalue())["status"], "stopped")
+        self.assertEqual(backup._leader(self.configuration), "test-leader")
+
+    def test_follower_stops_existing_backup_writer(self) -> None:
+        import subprocess
+
+        home = self.codex_home
+        agent = home / "Library" / "LaunchAgents" / (backup.LABEL + ".plist")
+        agent.parent.mkdir(parents=True)
+        agent.write_bytes(b"backup agent")
+
+        with patch.object(backup.Path, "home", return_value=home):
+            with patch.object(
+                backup.subprocess,
+                "run",
+                side_effect=[
+                    subprocess.CompletedProcess([], 0),
+                    subprocess.CompletedProcess([], 0),
+                ],
+            ) as launch:
+                result = backup.install(self.configuration, role="follower")
+
+        self.assertEqual(result["status"], "follower")
+        self.assertEqual(launch.call_count, 2)
+        self.assertFalse(agent.exists())
+
+    def test_restore_rejects_empty_state_snapshot_when_rollouts_exist(self) -> None:
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+        sessions = self.codex_home / "sessions"
+        sessions.mkdir()
+        (sessions / "2026").mkdir()
+
+        result = backup.restore_missing(self.configuration)
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn(
+            {
+                "name": "state",
+                "status": "invalid_snapshot",
+                "reason": "empty_thread_index",
+            },
+            result["sources"],
+        )
+        self.assertFalse(source.source.exists())
+
+    def test_restore_opens_snapshot_without_shared_sqlite_sidecars(self) -> None:
+        source = backup.database_sources(self.configuration)[1]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE records(value TEXT NOT NULL)")
+            snapshot.execute("INSERT INTO records VALUES ('authoritative')")
+
+        result = backup.restore_missing(self.configuration)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertFalse(Path(str(source.destination) + "-wal").exists())
+        self.assertFalse(Path(str(source.destination) + "-shm").exists())
+        with sqlite3.connect(str(source.source)) as restored:
+            self.assertEqual(
+                restored.execute("SELECT value FROM records").fetchall(),
+                [("authoritative",)],
+            )
+
+    def test_repair_replaces_unused_empty_state_with_nonempty_snapshot(self) -> None:
+        import subprocess
+
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.source)) as existing:
+            existing.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+            snapshot.execute("INSERT INTO threads VALUES ('authoritative')")
+
+        with patch.object(
+            backup.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 1, stdout="", stderr=""),
+        ) as handles:
+            result = backup.restore_missing(self.configuration, repair_empty=True)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertIn({"name": "state", "status": "repaired"}, result["sources"])
+        self.assertEqual(handles.call_count, 2)
+        with sqlite3.connect(str(source.source)) as repaired:
+            self.assertEqual(
+                repaired.execute("SELECT id FROM threads").fetchall(),
+                [("authoritative",)],
+            )
+
+    def test_repair_preserves_healthy_existing_state(self) -> None:
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.source)) as existing:
+            existing.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+            existing.execute("INSERT INTO threads VALUES ('keep-me')")
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+            snapshot.execute("INSERT INTO threads VALUES ('replacement')")
+
+        with patch.object(backup.subprocess, "run") as handles:
+            result = backup.restore_missing(self.configuration, repair_empty=True)
+
+        self.assertIn({"name": "state", "status": "existing"}, result["sources"])
+        handles.assert_not_called()
+        with sqlite3.connect(str(source.source)) as existing:
+            self.assertEqual(
+                existing.execute("SELECT id FROM threads").fetchall(),
+                [("keep-me",)],
+            )
+
+    def test_repair_refuses_state_database_with_open_handles(self) -> None:
+        import subprocess
+
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.source)) as existing:
+            existing.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+            snapshot.execute("INSERT INTO threads VALUES ('authoritative')")
+
+        with patch.object(
+            backup.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                [], 0, stdout="123\n", stderr=""
+            ),
+        ):
+            result = backup.restore_missing(self.configuration, repair_empty=True)
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn({"name": "state", "status": "in_use"}, result["sources"])
+        with sqlite3.connect(str(source.source)) as existing:
+            self.assertEqual(existing.execute("SELECT id FROM threads").fetchall(), [])
+
+    def test_repair_rechecks_handles_before_atomic_replacement(self) -> None:
+        import subprocess
+
+        source = backup.database_sources(self.configuration)[0]
+        source.destination.parent.mkdir(parents=True)
+        with sqlite3.connect(str(source.source)) as existing:
+            existing.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+        with sqlite3.connect(str(source.destination)) as snapshot:
+            snapshot.execute("CREATE TABLE threads(id TEXT PRIMARY KEY)")
+            snapshot.execute("INSERT INTO threads VALUES ('authoritative')")
+
+        with patch.object(
+            backup.subprocess,
+            "run",
+            side_effect=[
+                subprocess.CompletedProcess([], 1, stdout="", stderr=""),
+                subprocess.CompletedProcess([], 0, stdout="456\n", stderr=""),
+            ],
+        ):
+            result = backup.restore_missing(self.configuration, repair_empty=True)
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn(
+            {
+                "name": "state",
+                "status": "error",
+                "error_type": "PermissionError",
+            },
+            result["sources"],
+        )
+        with sqlite3.connect(str(source.source)) as existing:
+            self.assertEqual(existing.execute("SELECT id FROM threads").fetchall(), [])
 
 if __name__ == "__main__":
     unittest.main()
