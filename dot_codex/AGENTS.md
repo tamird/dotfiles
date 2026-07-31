@@ -37,7 +37,12 @@
   other user or system path without the user's explicit approval for that exact
   destination. Prefer repository-native Bazel and existing canonical caches;
   tell the user exactly where unavoidable new artifacts will be created and
-  how they can be removed before creating them.
+  how they can be removed before creating them. Canonical caches owned by
+  established tools, such as `~/.cache/gh`, are permitted; this does not
+  authorize agents to invent new cache locations.
+- In repositories that support Bazel, use Bazel exclusively for builds and
+  tests. Never substitute Cargo, just, or another build system for those
+  operations.
 - NEVER use `~/.codex` as scratch space. It is harness-managed, not a location
   for agent-created files. The only agent-editable exceptions are an explicitly
   authorized `~/.codex/AGENTS.md` or skill. Never create plans, notes,

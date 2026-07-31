@@ -28,8 +28,12 @@ authorize publication, review, or outreach.
 
 ## Make the contract explicit
 
-- Prefer closed types, exhaustive variants, and precise interfaces; avoid
+- Make invalid states unrepresentable with closed enums, newtypes,
+  exhaustive variants, and precise interfaces; avoid ambiguous flags,
   unnecessary casts, suppression, unchecked maps, and magic values.
+- Prefer immutable bindings and expression-oriented data flow. Introduce
+  mutation only when the algorithm, ownership, or measured performance
+  requires it; localize and clearly bound that state.
 - Keep required choices explicit, use lossless conversions, and test the
   exact error and unsupported failure rather than accepting any failure.
 - Validate recoverable inputs and assert actual internal invariants.
