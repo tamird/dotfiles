@@ -46,32 +46,33 @@ introducing commit, failing job, authoritative design, or behavioral test.
 A conversation may establish coordination but cannot replace technical
 evidence or make the reader discover the incident analysis elsewhere.
 
-Derive subject capitalization, wrapping, required test plans, citation
-conventions, and any area prefix from the current repository contribution
-rules and representative recent accepted changes in the affected component.
-Never import bracketed prefixes or other conventions from a different checkout,
-a generic example, or a single outlier. If local history is mixed and no
-repository rule or user instruction requires a prefix, omit it. Keep
-pull-request titles at or below 50 characters, including any required prefix.
-Prefer short paragraphs and real newlines. A fenced fragment is appropriate
-when it is literally code or similarly structured technical material that
-helps explain the change. A short bulleted list is appropriate when it is
-clearer than a comma-separated sentence. Do not treat either formatting
-choice as a defect by itself. Long lists, bulleted or otherwise, are an inventory smell: explain
-the unifying change instead, question an overly broad scope or missing
-abstraction, and keep only distinctions the reader actually needs. Avoid
-unnecessary section headings, literal `\n`, filler about unchanged behavior,
-and unsupported claims. Never include a validation inventory, passing-check
-summary, test count, execution command, or testing diary in a commit message
-or pull-request description; CI owns validation results. Describe the testing
-strategy only when it clarifies the regression, meaningful behavioral
-coverage, or remaining risk.
+Follow current repository contribution rules and representative accepted
+changes in the affected component for subject capitalization, wrapping,
+required test plans, citation conventions, and area prefixes. Do not import
+a prefix from another checkout, a generic example, or a single outlier; omit
+it when local history is mixed and no rule or user instruction requires it.
+Keep pull-request titles at or below 50 characters, including any prefix.
 
-Use unfenced, repository-linkified same-repository commit SHAs of at least
-nine characters, extending as needed for uniqueness and local linkification.
-Link directly to external artifacts and, in Slack, to the verified commit
-URL; never use a bare Slack SHA. Keep long references readable without hiding
-their reason.
+Prefer short paragraphs and real newlines. Write commit messages as plain
+text and pull-request descriptions so their raw text remains immediately
+readable without a Markdown renderer. Cite same-repository commits with
+unfenced SHAs of at least nine characters, extending them when uniqueness or
+linkification requires it. Link directly to authoritative external artifacts
+with numbered references in the prose and a compact list of URL definitions
+after the final paragraph, such as `[1]` and `[1]: https://example.com`. Do
+not use inline Markdown links, HTML, images, badges, collapsible sections,
+decorative emphasis, or other renderer-dependent markup. Simple bullet
+lists, aligned plaintext-readable tables that also happen to be Markdown,
+and fenced fragments containing actual code or similarly structured material
+are acceptable only when they materially clarify the change.
+
+Avoid section headings, literal `\n`, filler about unchanged behavior, and
+unsupported claims. Long lists suggest an inventory rather than a coherent
+change; explain the unifying behavior and retain only necessary distinctions.
+Never include a validation inventory, passing-check summary, test count,
+execution command, or testing diary in a commit message or pull-request
+description; CI owns validation results. Describe testing strategy only when
+it clarifies a regression, meaningful behavioral coverage, or remaining risk.
 
 Exclude task priority, work queues, agents, checkouts, monitoring, personal
 coordination, who noticed the issue, local commands, and testing diaries
