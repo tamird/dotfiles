@@ -50,6 +50,12 @@ causal failure, integration-branch breakage, infrastructure incident,
 quarantine, cancellation, pending work, and absent evidence. Never call an
 unverified or unsuccessful check green.
 
+Map required checked-in test policy and projected, generated, or
+platform-specific CI paths to the exact change before publication. Run the
+required user-visible integration path when local infrastructure permits; if a
+pre-existing bootstrap failure prevents it, report that precise limitation and
+verify the new head's corresponding CI result instead of claiming local parity.
+
 For a genuinely shared required-check failure, verify and link the actual
 source, failure, owner, and existing correction on each affected change.
 Route implementation to the original owner. Refresh an existing evidence-

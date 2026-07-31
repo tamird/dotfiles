@@ -11,6 +11,9 @@ authorize publication, review, or outreach.
 
 ## Establish the design
 
+- Read all applicable checked-in implementation and testing instructions,
+  including fixture, generator, and execution-environment sections. Mandatory
+  requirements override historical exceptions and nearby shortcuts.
 - Identify the actual problem, producer, consumer, ownership boundary,
   supported platforms, invariants, and failure behavior.
 - Prefer the canonical source, an existing interface, deletion, or a narrower
@@ -31,6 +34,12 @@ authorize publication, review, or outreach.
 - Make invalid states unrepresentable with closed enums, newtypes,
   exhaustive variants, and precise interfaces; avoid ambiguous flags,
   unnecessary casts, suppression, unchecked maps, and magic values.
+- Model each lifecycle phase independently. Include every input captured by
+  in-flight work in its phase-specific identity, normalize effective defaults,
+  and distinguish startup invariants from invariants after readiness.
+- Trace atomic transitions across reads, awaits, and rechecks. A narrow race
+  is still a correctness defect; classify states without dropping a valid
+  transition and exercise controlled lifecycle boundaries deterministically.
 - Prefer immutable bindings and expression-oriented data flow. Introduce
   mutation only when the algorithm, ownership, or measured performance
   requires it; localize and clearly bound that state.
@@ -44,6 +53,9 @@ authorize publication, review, or outreach.
   fail. Prefer a focused behavioral regression to mock plumbing, snapshots,
   import assertions, tautologies, negative-only assertions, or oversized
   fixtures. Remove duplicated or dead tests instead of multiplying them.
+- Use the repository's environment-aware fixture and runner constructors so
+  new behavioral coverage actually executes across its supported foreign,
+  sandboxed, and cross-platform test matrix.
 
 ## Diagnose failures and bound mitigations
 
