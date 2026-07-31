@@ -30,6 +30,14 @@
 
 # Repository and machine safety
 
+- NEVER hide agent-created artifacts, caches, tool installations, scratch
+  files, downloads, or build outputs in random, hidden, implicit, or
+  hard-to-discover directories. Never create a new cache, tool home, temporary
+  directory, or output location under `~/.cache`, `~/Library/Caches`, or any
+  other user or system path without the user's explicit approval for that exact
+  destination. Prefer repository-native Bazel and existing canonical caches;
+  tell the user exactly where unavoidable new artifacts will be created and
+  how they can be removed before creating them.
 - NEVER use `~/.codex` as scratch space. It is harness-managed, not a location
   for agent-created files. The only agent-editable exceptions are an explicitly
   authorized `~/.codex/AGENTS.md` or skill. Never create plans, notes,
