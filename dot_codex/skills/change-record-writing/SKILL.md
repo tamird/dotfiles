@@ -46,19 +46,26 @@ introducing commit, failing job, authoritative design, or behavioral test.
 A conversation may establish coordination but cannot replace technical
 evidence or make the reader discover the incident analysis elsewhere.
 
-Follow the repository's subject prefixes, capitalization, wrapping,
-formatting, required test plan, and citation convention. Keep pull-request
-titles at or below 50 characters, including any subject prefix. Prefer short
-paragraphs and real newlines. A fenced fragment is appropriate when it is
-literally code or similarly structured technical material that helps explain
-the change. A short bulleted list is appropriate when it is clearer than a
-comma-separated sentence. Do not treat either formatting choice as a defect
-by itself. Long lists, bulleted or otherwise, are an inventory smell: explain
+Derive subject capitalization, wrapping, required test plans, citation
+conventions, and any area prefix from the current repository contribution
+rules and representative recent accepted changes in the affected component.
+Never import bracketed prefixes or other conventions from a different checkout,
+a generic example, or a single outlier. If local history is mixed and no
+repository rule or user instruction requires a prefix, omit it. Keep
+pull-request titles at or below 50 characters, including any required prefix.
+Prefer short paragraphs and real newlines. A fenced fragment is appropriate
+when it is literally code or similarly structured technical material that
+helps explain the change. A short bulleted list is appropriate when it is
+clearer than a comma-separated sentence. Do not treat either formatting
+choice as a defect by itself. Long lists, bulleted or otherwise, are an inventory smell: explain
 the unifying change instead, question an overly broad scope or missing
 abstraction, and keep only distinctions the reader actually needs. Avoid
-unnecessary section headings, literal `\n`, local validation theater, filler
-about unchanged behavior, and unsupported claims. Include validation only
-when the repository, actual risk, or user requires it.
+unnecessary section headings, literal `\n`, filler about unchanged behavior,
+and unsupported claims. Never include a validation inventory, passing-check
+summary, test count, execution command, or testing diary in a commit message
+or pull-request description; CI owns validation results. Describe the testing
+strategy only when it clarifies the regression, meaningful behavioral
+coverage, or remaining risk.
 
 Use unfenced, repository-linkified same-repository commit SHAs of at least
 nine characters, extending as needed for uniqueness and local linkification.

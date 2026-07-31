@@ -18,8 +18,11 @@ Do not modify someone else's branch, description, threads, or reviewers.
 
 Use the unchanged normal Git identity, signing, hooks, and configuration.
 Do not change Git or HTTP settings, bypass hooks, or impersonate a review
-signature. Use exact-head `--force-with-lease` only when the user has
-authorized the intended branch. Stop and report a genuine authorization,
+signature. Run environment-sensitive Git commands through normal project
+activation, such as `mise x --`; diagnose missing activation before changing
+`SSH_AUTH_SOCK`, signing identity, credentials, or hook settings. Use
+exact-head `--force-with-lease` only when the user has authorized the intended
+branch. Stop and report a genuine authorization,
 credential, ownership, or hook blocker.
 
 Before pushing a branch rebased on a shared default branch, verify that the
