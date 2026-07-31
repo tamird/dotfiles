@@ -1,15 +1,13 @@
 ---
 name: workstream-orchestration
-description: Coordinate user-authorized engineering work across existing agents, exclusive checkouts, independent design review, live feedback, CI, and a verified current-state snapshot.
+description: Coordinate user-authorized engineering work across existing agents, exclusive checkouts, independent design review, live feedback, and verified CI.
 ---
 
 # Workstream Orchestration
 
 The primary agent owns the authorized objective, sequencing, agent scope,
-integration, verification, and response. Read
-`~/Google Drive/My Drive/Codex/runtime/operator-profile.md` for private workstream,
-checkout, user-task, logging, source, and authority policy. Use the existing
-authorized current-state snapshot and sole writer; do not invent a board.
+integration, verification, and response. Verify authority, checkout ownership,
+and current provider state directly for the user's actual request.
 
 ## Keep authority and work coherent
 
@@ -38,35 +36,29 @@ contexts; each child must first clean up its own completed descendants. Avoid
 recursive or speculative delegation without interrupting productive,
 disjoint parallel work.
 
-Consolidate duplicate review, CI, and message monitors under their existing
-authenticated source owners and sole writers. Do not start a replacement,
-transfer ownership, or discard a live watermark to reduce the agent count.
+Inspect review, CI, and message state directly through its authenticated
+provider. Do not create background monitors or private receipt databases.
 
-Use `$maintainer-review` for independent cumulative design review. Use
-`$notification-watcher`, `$review-intake`, `$pull-request-delivery`,
-`$reviewer-outreach`, and `$slack-control-plane` only when their distinct
-actions are authorized and needed.
-Do not change identity, signing, hooks, or another agent's source.
+Use `$maintainer-review` or its relevant domain-specific descendant for an
+authorized independent design review. Use `$pull-request-delivery` and
+`$reviewer-outreach` only when their distinct actions are authorized and
+needed. Do not change identity, signing, hooks, or another agent's source.
 
 ## Route user work and review events
 
-Use `$notification-watcher` and the existing checklist and profile for
-authorized task, feedback, continuous-integration, and review sources.
-Authenticate actual human authors, event identities, complete threads, and
-each source's own replay mark. Exclude assistant-authored outbox without
-discarding a later genuine human reply.
+Inspect explicitly authorized task, feedback, continuous-integration, and
+review sources directly through their providers. Authenticate actual human
+authors, event identities, and complete threads. Exclude assistant-authored
+outbox without discarding a later genuine human reply.
 
-Give a real human review request the configured highest priority and route
-it through `$review-intake`. Route an existing owner answer or authored-PR
-finding to its original workstream. Never start another scanner, take over
-the sole writer, mistake historical receipts for a backlog, or interpret a
+When the user authorizes a genuine human review request, use the appropriate
+maintainer-review skill. Route an existing owner answer or authored-PR finding
+to its original workstream. Never start a background scanner or interpret a
 third-party comment as a new user task.
 
-Keep each authorized user task's actual thread and existing owner. Record a
-verified acknowledgement, real blocker, and terminal result only through
-the configured writer. User-task intake and agent scheduling belong to this
-workflow; `$slack-control-plane` owns authorized Slack acknowledgements and
-outbound reporting only.
+Keep each authorized user task's actual thread and existing owner. Report a
+verified acknowledgement, real blocker, or terminal result only when the user
+authorizes it.
 
 ## Own verified CI failures
 
@@ -87,25 +79,13 @@ record its primary evidence, actual owner, and concrete blocker in the
 authorized source-owned artifact. Do not invent a fleet-wide initiative,
 unbounded instrumentation, broad retry, or competing incident.
 
-## Keep an honest current-state snapshot
+## Report verified outcomes
 
-Use only the already authorized snapshot and its sole writer. Record the
-actual objective, owner, full head, source-causal CI, review state, blocker,
-user decision, and next action. Verify live claims directly at the canonical
-provider or state; a historical snapshot, inherited summary, or another
-agent's assertion is not current evidence. Update on verified first-party
-changes, not every poll; coalesce closely related updates.
-
-For each active pull request, show its provider-verified current title and a
-direct link. If the user requests intake coverage, expose only the earliest
-verified complete source high-water mark, its age, and whether coverage is
-healthy. Keep per-source cursors, incident history, and diagnostic commands
-in private operational state rather than the user-facing snapshot.
-
-Remove closed and merged work from active and needs-user sections. Monitor
-actual conflicts, changed review findings, required checks, genuine owner
-replies, and in-place merge-validation updates. Wake only the original
-implementation owner when a necessary action appears.
+Verify the actual objective, owner, head, CI, review state, blockers, and next
+action directly through their providers. Report material outcomes in the
+current conversation when requested; a historical summary or another agent's
+assertion is not current evidence. Wake only the original implementation owner
+when a necessary action appears.
 
 Continue while authorized, useful work remains. Stop only when the objective
 is actually complete, the user pauses it, or an established external or

@@ -1,4 +1,4 @@
 interface:
   display_name: "BPF Upstream Review"
-  short_description: "Prepare and review BPF kernel patch series"
-  default_prompt: "Use $bpf-upstream-review to prepare or review this BPF patch series for upstream submission."
+  short_description: "Apply Linux upstream review to BPF patches"
+  default_prompt: "Use $bpf-upstream-review to apply BPF subsystem maintainers' Linux upstream expectations to this patch series."

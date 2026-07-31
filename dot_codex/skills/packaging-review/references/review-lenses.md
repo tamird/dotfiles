@@ -2,7 +2,7 @@
 
 Consult the primary specification or tool documentation that owns the
 affected behavior. These sources are public, maintainer-neutral evidence;
-project history or a private reviewer profile is a separate, optional input.
+project-specific history is useful only when actually relevant and accessible.
 
 ## Declarations, extras, and dependency groups
 
@@ -29,3 +29,7 @@ project history or a private reviewer profile is a separate, optional input.
 Use the specification that actually governs the observed problem; do not
 treat a related tool, an incident discussion, or a successful retry as a
 substitute for the affected package's producer and consumer.
+
+Refresh the actual specification relevant to the affected package. Never
+substitute unrelated review history for the current packaging maintainers'
+decisions.

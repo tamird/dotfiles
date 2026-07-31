@@ -20,11 +20,6 @@ prefix_rule(
     justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
 )
 prefix_rule(
-    pattern=["applied", "bazel"],
-    decision="allow",
-    justification="The Applied Bazel wrapper needs host access for downloads, remote execution, and remote caches.",
-)
-prefix_rule(
     pattern=["nice", "-n", "20", "bazel"],
     decision="allow",
     justification="Bazel needs host access for repository downloads, remote execution, and remote caches.",
@@ -43,11 +38,6 @@ prefix_rule(
     pattern=["nice", "-n", "20", "./project/dotslash-gen/bin/bazelisk"],
     decision="allow",
     justification="Bazelisk and Bazel need host access for downloads, remote execution, and remote caches.",
-)
-prefix_rule(
-    pattern=["nice", "-n", "20", "applied", "bazel"],
-    decision="allow",
-    justification="The Applied Bazel wrapper needs host access for downloads, remote execution, and remote caches.",
 )
 prefix_rule(pattern=["/bin/zsh", "-lc", "bazel test --macos_sdk_version=$(xcrun --show-sdk-version) -- //tools/nogo/... //tools/check{aligned,const,escape,linkname,locks,unsafe}/..."], decision="allow")
 prefix_rule(pattern=["cargo", "fetch", "-p", "k8s-csi"], decision="allow")

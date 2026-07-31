@@ -1,4 +1,4 @@
 interface:
   display_name: "Linux Upstream Review"
-  short_description: "Review and reroll Linux kernel patch series"
-  default_prompt: "Use $linux-upstream-review to review and prepare this Linux kernel patch series."
+  short_description: "Apply mailing-list review to kernel patches"
+  default_prompt: "Use $linux-upstream-review to apply Linux subsystem maintainers' mailing-list expectations to this patch series."

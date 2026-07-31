@@ -1,4 +1,4 @@
 interface:
   display_name: "Maintainer Review"
-  short_description: "Review changes against maintainer evidence"
-  default_prompt: "Use $maintainer-review to review this cumulative change and report evidence-backed findings."
+  short_description: "Review through actual maintainer expectations"
+  default_prompt: "Use $maintainer-review to derive the relevant maintainers' expectations from affected-path history and review this change through their evidenced technical perspectives."

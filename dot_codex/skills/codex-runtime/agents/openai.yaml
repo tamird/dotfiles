@@ -1,4 +1,0 @@
-interface:
-  display_name: "Codex Runtime"
-  short_description: "Maintain local Codex runtime services"
-  default_prompt: "Use $codex-runtime to inspect and maintain local Codex backup and network services."

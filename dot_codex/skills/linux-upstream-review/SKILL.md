@@ -22,10 +22,11 @@ Before editing:
 Use the base skill's lore fetcher with the narrowest relevant archive. Do not
 substitute GitHub PR metadata for kernel history or lore.
 
-When an explicitly authorized task requires a configured private mailbox or
-message index, consult `~/Google Drive/My Drive/Codex/runtime/operator-profile.md` for
-the relevant subsystem's inbox, current-series thread, and local reply
-workflow. The private profile neither authorizes mailbox access nor sending.
+When the user explicitly authorizes Rust-for-Linux mailbox access, use
+`rfl-mail inbox` for the configured inbox and `rfl-mail series` for the current
+patch-series thread. Prepare an authorized reply with
+`lei lcat --no-remote --no-external -f reply id:<msgid>`; obtain explicit user
+confirmation before sending through `msmtp`.
 
 Treat a generated reply as a draft. Verify its original Message-ID,
 recipients, quoted context, threading headers, and rendered content; obtain

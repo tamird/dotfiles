@@ -6,9 +6,8 @@ description: Prepare and advance an explicitly authorized pull request while che
 # Pull Request Delivery
 
 Use `$change-record-writing` for the change record and `$maintainer-review`
-for the complete design. Read `~/Google Drive/My Drive/Codex/runtime/operator-profile.md`
-when repository-specific publication, attribution, fallback-review, or
-draft policy is relevant. Missing private authority is a blocker.
+for the complete design. Verify repository-specific publication, attribution,
+review, and draft policy directly. Missing authority is a blocker.
 
 ## Establish the actual authority
 
@@ -31,10 +30,9 @@ update `origin/<default>`. Hooks comparing `<remote>/<default>..HEAD` must
 see the real integration base. Fix a stale ref; never bypass a multi-author
 hook, skip verification, or change Git configuration to hide the problem.
 
-Respect the current repository instructions and operator profile. Choose
-ready or draft status from the actual authorized workflow; do not infer a
-draft default. Use an independent base unless stacking is semantically
-necessary and authorized.
+Respect the current repository instructions. Choose ready or draft status from
+the actual authorized workflow; do not infer a draft default. Use an
+independent base unless stacking is semantically necessary and authorized.
 
 ## Validate the complete change
 
@@ -68,15 +66,15 @@ rendered correction.
 ## Keep reviews and ownership current
 
 Apply repository-specific automated review or fallback rules only when the
-operator profile authorizes them. Verify the provider's current availability,
-actual bot identity, draft and frozen state, full head, prior review, and
-existing requests. Never request a review for a draft or frozen change, treat
-an automated finding as a human request, or start a competing scanner.
+user authorizes them. Verify the provider's current availability, actual bot
+identity, draft and frozen state, full head, prior review, and existing
+requests. Never request a review for a draft or frozen change or treat an
+automated finding as a human request.
 
 When the user authorizes human solicitation, use `$reviewer-outreach`.
 Re-request a human review only after that review's substantive findings have
-actually been addressed. Register authorized outgoing threads with their
-existing source owner; follow genuine replies without creating new work.
+actually been addressed. Follow genuine replies directly in their existing
+provider threads without creating new work.
 
 Explicitly acknowledge every substantive top-level human request after
 verifying its disposition against the current head. When the provider cannot

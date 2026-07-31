@@ -71,8 +71,9 @@ precedence, existing behavior, and intended owner.
 
 Promote cross-domain always-on policy to `AGENTS.md`; put a reusable workflow
 in its existing owning skill, and repository-specific guidance in its actual
-repository. Keep private operator rules outside publishable skills. Apply
-`$skill-creator` before creating or substantially revising a skill.
+repository. Keep credentials, private identities, and private repository URLs
+out of generic skills. Apply `$skill-creator` before creating or substantially
+revising a skill.
 
 Merge existing guidance rather than duplicating it. Reject one-off requests,
 stale incidents, inferred preferences, and already-covered candidates.

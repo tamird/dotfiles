@@ -1,14 +1,16 @@
 ---
 name: mailing-list-review
-description: Prepare, review, reroll, and respond to email-based patch series using public-inbox archives such as lore. Use when reconstructing prior revisions and replies, reviewing code and permanent prose, maintaining feedback dispositions, preparing a reroll, or inspecting rendered mail. Project-specific upstream-review skills build on this shared base.
+description: Extend maintainer-history review for email-based patch series by discovering maintainer expectations in mailing-list archives, reconstructing revision threads, accounting for feedback, and preparing project-correct rerolls.
 ---
 
 # Mailing List Review
 
-Apply `$maintainer-review`, which also supplies the writing and history bases.
-This skill adds the mailing-list record, feedback, reroll, and delivery
-workflow. Preparing or reviewing a series does not authorize sending mail,
-publishing a branch, contacting maintainers, or claiming review credit.
+Apply `$maintainer-review` first. Its maintainer-persona discovery, personal
+`$coding-style` baseline, and change-record review remain authoritative. This
+skill adds mailing-list history, maintainer feedback, revision threads, and
+mail delivery conventions. Preparing or reviewing a series does not authorize
+sending mail, publishing a branch, contacting maintainers, or claiming review
+credit.
 
 Own the complete series rather than polishing the latest diff in isolation.
 Reconstruct the discussion, understand the invariant, and make the permanent
@@ -21,7 +23,8 @@ Collect:
 - the exact base, complete series, diff, and cover letter;
 - every submitted revision and all replies, including nested replies;
 - the target branch and overlapping topics;
-- comparable accepted commits and current submission guidance.
+- comparable accepted commits and current submission guidance;
+- substantive comments from the maintainers who own the affected paths.
 
 Use `scripts/fetch_lore_threads.py` through the local liblore environment:
 
@@ -36,6 +39,15 @@ uv run --project ~/code/b4/liblore \
 Select the narrowest public-inbox endpoint that contains the thread. Do not
 substitute a web UI, remembered discussion, or a revision changelog for the
 complete record.
+
+## Derive maintainer personas from mailing-list history
+
+Identify actual subsystem maintainers from checked-in ownership, accepted
+patches, affected-path history, and prior substantive thread replies. Inspect
+what each relevant maintainer previously accepted, rejected, or required for
+the same interface or design tradeoff. Seed those evidence-backed review
+lenses before rerolling; a participant, Cc, employer, or previous approval
+alone does not establish a maintainer's technical expectations.
 
 ## Track feedback
 

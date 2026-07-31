@@ -6,9 +6,9 @@ description: Identify qualified change owners and, only when explicitly authoriz
 # Reviewer Outreach
 
 Use `$audience-aware-writing` and available `$maintainer-review` evidence.
-Read `~/Google Drive/My Drive/Codex/runtime/operator-profile.md` when private identity,
-communication preferences, destinations, or outreach authority matter.
-Finding a reviewer or drafting a request never authorizes sending it.
+Verify identity, communication preferences, destinations, and outreach
+authority directly. Finding a reviewer or drafting a request never authorizes
+sending it.
 
 ## Identify the right owner
 
@@ -46,8 +46,8 @@ thread instead of creating another root. Where an authorized active source
 fix needs prompt owner attention, state the verified failure and current CI
 accurately; do not infer permission to merge or bypass approval.
 
-Read back any authorized publication and register its thread with the
-existing review-source owner. Continue to monitor genuine owner replies.
+Read back any authorized publication and follow genuine owner replies in the
+same provider thread.
 Do not manufacture an adoption decision, repeatedly nag, direct-message a
 person to discover whether a fix exists, contact unrelated teams, or recruit
 a replacement through another reviewer.

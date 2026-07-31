@@ -1,114 +1,75 @@
 ---
 name: maintainer-review
-description: Review a complete change for its evidenced need, ownership, invariants, meaningful coverage, precise contracts, measured cost, change record, and authorized review verdict.
+description: Derive affected maintainers' technical review personas from ownership, commit history, prior reviews, and accepted changes, then apply those evidence-backed perspectives to a complete change before publication.
 ---
 
 # Maintainer Review
 
-Use `$efficient-repo-tools` for bounded evidence, `$coding-style` for design
-and implementation criteria, `$change-record-writing` for the rendered record,
-and `$audience-aware-writing` for findings. A review authorizes no source
-edit, publication, outreach, identity change, new workstream, or merge.
+Apply `$coding-style` and `$change-record-writing` as the user's own baseline;
+they are not evidence of another maintainer's preferences. Use
+`$efficient-repo-tools` for bounded repository discovery and
+`$audience-aware-writing` for any authorized findings.
 
-## Establish why the complete change belongs
+## Identify the actual review boundary
 
-Verify the exact repository, author, full current head, target, merge base,
-complete changed files, unresolved discussion, and actual validation. Page
-provider results completely. Distinguish source from generated output, locks,
-fixtures, vendoring, and mechanical change.
+Establish the repository, exact head, integration base, complete change,
+affected paths, interfaces, consumers, and unresolved discussion. Distinguish
+handwritten source from generated output and incidental movement. Include
+related changes only when together they introduce or consume the same
+contract.
 
-Trace the real producer, consumer, entrypoints, supported platforms, failure,
-ownership, and invariant. Review the cumulative change, including a live or
-merged parent or child when together they introduce or consume an interface.
-Inspect pre-existing code only when the change depends on or exposes it.
+Identify the people who actually maintain those boundaries using checked-in
+ownership, affected-path history, recent accepted changes, substantive review
+comments, and the repository's contribution process. Commit authorship,
+organizational affiliation, assignment, or an approval alone does not prove
+maintainership.
 
-Require an evidenced answer: what actually fails or is needed, whom it
-affects, why the existing mechanism cannot handle it, why this owner is
-correct, and how this change repairs the source. Approval, passing checks,
-implementation detail, or assertive prose is not evidence of necessity.
+Start with bounded path-specific history:
 
-Increase scrutiny for hidden executable logic, broad handwritten changes,
-parallel policy or selectors, sensitive production behavior, unproven
-recovery, and expanding legacy. Mechanical breadth and author identity are
-not findings. Use private maintainer history only when the user authorizes
-the actual profile, and substantiate every conclusion independently.
+```sh
+git log --follow -n 30 -- path/to/affected/file
+git blame -L start,end -- path/to/affected/file
+```
 
-## Test the design, coverage, and cost
+Inspect the corresponding reviews, discussions, and accepted alternatives
+through the repository's actual first-party provider. Prefer recent comments
+on the same subsystem, interface, failure mode, or design tradeoff. Never
+invent private access or replace another maintainer's evidence with the user's
+historical preferences.
 
-Apply `$coding-style` to canonical ownership, supported consumers, dependency
-boundaries, meaningful regression tests, precise checked types, comments,
-deferred cleanup, and shared-platform behavior. Report the actual violated
-contract; do not reject legitimate dynamic or generated interfaces.
+## Construct evidence-backed maintainer personas
 
-Challenge duplicate mechanisms; unsupported fallbacks, compatibility paths,
-ignores, or dynamic imports; hidden source embedded in shell or configuration;
-silent errors; lost evidence; obsolete parallel machinery; and unaccounted
-shared startup, network, resolution, generation, or action cost. Accept
-small, justified boundary glue.
+For each relevant maintainer or ownership boundary, derive:
 
-For each test, identify a plausible broken implementation that would fail.
-Reject tautologies, unverified mock or import assertions, incidental
-snapshots, and oversized fixtures. Verify relevant existing contracts and
-flag avoidable `Any`, unchecked casts, suppressions, broad exceptions,
-ambiguous flags, magic literals, and non-exhaustive domain handling.
+- The subsystem and decisions that person actually owns.
+- Recurring technical concerns demonstrated by their real comments or commits.
+- Previously rejected approaches and the concrete reason they were rejected.
+- Compatibility, testing, migration, performance, and submission standards
+  that apply to this change.
+- Whether the historical evidence is current, directly applicable, and
+  consistent with the current source.
 
-Require the actual explanation for a platform-specific correction, behavior
-on other supported platforms, and evidence whether one common fix works.
-Support measurable performance claims with the affected workflow, baseline,
-before and after, cache conditions, and memory or sharing costs.
+Ground each lens in independently attributable evidence. Distinguish a
+repository requirement from an individual preference, a stale objection, a
+resolved issue, or an unsupported inference. Do not invent personality traits,
+imitate maintainers, or infer a technical standard from identity alone.
 
-## Establish incidents and escaped failures
+## Review through those personas
 
-Trace an incident to its original artifact, producer, worker, cache identity,
-timing, and first-party failure. A later successful retry, different worker,
-synthetic corruption, or correlation is not a cause. Reject mitigation that
-hides recurrence or weakens a healthy path; a necessary mitigation must
-retain evidence, expose activation, fail closed, bound cost, and identify its
-owner, justification, and removal condition.
+Inspect the complete change through each applicable maintainer lens before a
+real reviewer has to raise the same issue. Trace the actual invariant,
+producer, consumer, failure path, ownership, and validation relevant to that
+lens. Check whether the change repeats a previously rejected design, violates
+an established interface, omits an expected case, or leaves a foreseeable
+maintainer question unanswered.
 
-For a default-branch regression, establish the introducing change, trigger,
-actual failed job, selected tests, merge gate, environment, and why the
-defect was allowed to land. Require regression coverage or a correction to
-the real selection or required-check gap. If prevention is infeasible,
-identify its primary evidence, owner, and blocker. Do not invent a wider
-incident or initiative.
+Apply the user's `$coding-style` and `$change-record-writing` separately; never
+misattribute those preferences to repository maintainers. Where evidenced
+maintainer expectations conflict, explain the concrete tradeoff instead of
+inventing consensus.
 
-## Review the record and deliver the right verdict
-
-Apply `$change-record-writing` to the actual title and rendered cumulative
-description, including its pull-request title-length limit, causal reason,
-primary citations, platform rationale, and the repository's real formatting.
-Literal code fences and short clarifying bullet lists are legitimate; flag a
-long inventory for its unnecessary scope or missing narrative, not merely
-because it uses Markdown.
-Never invent an author's rationale or edit another person's record without
-explicit authorization.
-
-Before approving or disputing a citation, verify the provider's first-party
-raw Markdown `body`, its actual link destination, and the concise supporting
-evidence. Rendered or plain `bodyText` cannot establish a link's destination.
-
-Rank substantiated findings by security, correctness, data, production cost,
-and maintainability. Explain the concrete trigger, violated invariant,
-affected consumer, impact, and smallest source-owned correction. Anchor each
-independent source defect inline; use one concise overall comment for
-cross-cutting design, prose, or unanchorable evidence. Batch repetition and
-reply in the existing discussion.
-
-Reserve a request-changes verdict for a genuinely severe, evidenced finding,
-such as an exploitable security boundary, data loss, a production outage, or
-a comparably serious correctness failure. A defect's label, author, volume,
-or hypothetical severity is not enough. Leave ordinary correctness,
-maintainability, testing, and documentation findings as neutral comments;
-approve only when no relevant findings remain.
-
-CI owns failed-check gating: do not request changes merely because a check is
-red, pending, or unrelated. When sound code has only a deficient description,
-leave a neutral finding; neither approve nor request changes. If an earlier
-change request from the principal is now superseded because no severe finding
-remains, clear that principal-owned request rather than leaving a neutral
-comment while the pull request remains blocked. Verify the
-repository's actual owner scope, draft policy, neutral-only requirements,
-and explicitly authorized delegated attribution; do not claim an approval
-satisfies another owner's gate. Publish only when authorized, reverify the
-exact head and inline anchors, and verify the resulting provider receipt.
+Report only independently verified findings. Explain the affected code,
+actual impact, supporting maintainer evidence, and smallest appropriate
+correction; separate a blocking requirement from a question or stylistic
+preference. Reviewing does not authorize editing code, publishing comments,
+contacting maintainers, or merging.

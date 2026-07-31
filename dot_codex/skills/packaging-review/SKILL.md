@@ -1,19 +1,30 @@
 ---
 name: packaging-review
-description: Review Python packaging, dependency resolution, interpreter and platform selection, lock generation, bootstrap, wheel safety, typing, and repository-wide cost. Use for evidence-backed package, installer, resolver, or dependency-universe review.
+description: Extend maintainer-history review with Python packaging, dependency resolution, supported interpreters and platforms, lock generation, distribution artifacts, and real downstream installation behavior.
 ---
 
 # Packaging Review
 
-Apply `$maintainer-review` to the cumulative change and
-`$efficient-repo-tools` to bounded source and consumer discovery. Review does
-not authorize publishing, implementation, reviewer outreach, a delegated
-identity, or private access. Consult
-[references/review-lenses.md](references/review-lenses.md) when public
-packaging history helps resolve the actual question. Only when explicitly
-relevant and user-authorized, consult the optional owner-only
-`~/Google Drive/My Drive/Codex/runtime/review-monitor/reviewer-profiles.md`; an absent
-profile is not a defect.
+Apply `$maintainer-review` first. Inherit its affected-path ownership research,
+actual maintainer personas, personal `$coding-style` baseline, and change-record
+review. This skill adds only packaging-specific sources, maintainers, failure
+modes, and validation. Consult
+[references/review-lenses.md](references/review-lenses.md) when the affected
+packaging specification is relevant.
+
+## Identify packaging-specific maintainers
+
+Locate the actual owners of package metadata, lock generation, resolver or
+installer integration, wheel builds, release workflows, and consuming
+applications. Examine their recent changes and substantive reviews on the
+affected package boundary; a general repository owner need not maintain its
+packaging workflow.
+
+Seed distinct packaging, release, resolver, or downstream-consumer personas
+only when the repository history establishes their relevance. Prefer their
+actual decisions about supported interpreters, architectures, compatibility,
+dependency ownership, migration, and generated artifacts over assumptions
+about what a packaging maintainer might want.
 
 ## Establish the real package boundary
 
@@ -21,8 +32,9 @@ Identify the source that owns declared dependencies, interpreter and
 platform selection, extras, constraints, indexes, build metadata, lock
 generation, distribution artifacts, installation, and startup. Trace the
 real resolver, installer, generated output, runtime consumer, fallback, and
-failure path. Distinguish the checkout being analyzed from the source that
-is actually running.
+failure path. Establish the actual user problem and package owner before
+adding bootstrap or compatibility machinery. Distinguish the checkout being
+analyzed from the source that is actually running.
 
 Change the authoritative declaration and use its canonical generator. Reject
 parallel locks, copied constraints, metadata overrides that replace unrelated
@@ -33,12 +45,13 @@ consumer for an extra, compatibility path, optional import, or exception.
 
 Check dynamic dependencies, source distributions and wheels, supported
 interpreter versions, platform markers, dependency groups, concurrent access,
-cache identity, fail-closed error propagation, and repository-wide build and
-action selection. Remove superseded machinery after migrating all actual
-consumers. Keep public and private dependency sources at their explicitly
-authorized boundary.
+cache identity, explicit fail-versus-skip behavior, fail-closed error
+propagation, and repository-wide build and action selection. Prove a
+runtime invariant before replacing uncertainty with an assertion. Remove
+superseded machinery after migrating all actual consumers. Keep public and
+private dependency sources at their explicitly authorized boundary.
 
-## Validate impact and failure evidence
+## Apply domain-specific validation
 
 Measure installation, resolution, network, import, filesystem, startup,
 runfiles, or generated fanout on the actual affected workflow. Compare
@@ -47,18 +60,8 @@ warm cache behavior. A warm remote-cache hit is not evidence of an expensive
 local rebuild; a wheel-only improvement is not evidence of end-to-end
 application startup gains.
 
-Do not infer production cache corruption from an artificial fixture, a retry
-on another worker, or a later successful download. Establish the original
-artifact, digest, authoritative producer, cache and worker identity,
-concurrency, first failure, and incidence. A justified temporary mitigation
-must retain that evidence, expose activation metrics, bound and fail-close
-recovery, measure healthy-path cost, and name the source owner and removal
-condition. Otherwise correct or expose the source; do not normalize a broad
-installer retry or fallback.
-
 For packaging tests, identify the real incorrect declaration, resolution,
-installation, import, or generated output they would catch. Require precise
-types and meaningful behavioral coverage; do not accept mocked resolver
-plumbing or a green lock check as proof of a new architecture. Report only
-falsifiable findings supported by the actual package, downstream consumer,
-maintainer evidence, and current validation.
+installation, import, wheel, or generated output they would catch. Verify
+affected interpreter and architecture combinations through their actual
+build or installation path. Report only findings supported by the package,
+downstream consumer, applicable maintainer history, and current validation.

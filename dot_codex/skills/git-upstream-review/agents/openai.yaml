@@ -1,4 +1,4 @@
 interface:
   display_name: "Git Upstream Review"
-  short_description: "Audit Git patches against maintainer expectations"
-  default_prompt: "Use $git-upstream-review to audit this Git patch and prepare it for submission."
+  short_description: "Apply mailing-list review to Git patches"
+  default_prompt: "Use $git-upstream-review to apply Git maintainers' mailing-list expectations to this patch series."

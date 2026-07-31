@@ -25,10 +25,10 @@ build, and submission constraints.
    Account for public APIs, ELF and BTF conventions, generated formats,
    and light skeletons as compatibility commitments.
 
-When an explicitly authorized task requires a configured private mailbox or
-message index, consult `~/Google Drive/My Drive/Codex/runtime/operator-profile.md` for
-the correct subsystem-specific routing. Public lore remains the default;
-the private profile neither authorizes mailbox access nor sending mail.
+Public lore is the default. When the user explicitly authorizes private BPF
+mail, synchronize the configured inbox with `mbsync -q bpf` and index it with
+`lei index -r "$HOME/Mail/bpf"`. Private mailbox access never authorizes
+sending mail.
 
 ## Select BPF review lenses
 
