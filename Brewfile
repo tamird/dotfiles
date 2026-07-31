@@ -21,7 +21,7 @@ brew "chezmoi"
 brew "shellcheck"
 brew "actionlint"
 
-brew "bazel"
+brew "bazelisk"
 brew "buildifier"
 
 brew "gh"
