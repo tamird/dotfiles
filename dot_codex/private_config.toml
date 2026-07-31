@@ -4,84 +4,18 @@ commit_attribution = ""
 service_tier = "fast"
 model_reasoning_effort = "xhigh"
 
-notify = ["/Users/tamird/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
-
 [sandbox_workspace_write]
 network_access = true
 
-[features]
-apps = true
-hooks = true
-multi_agent = true
-rmcp_client = true
-memories = true
-js_repl = false
+[memories]
+generate_memories = true
+use_memories = true
 
-[plugins."linear@openai-curated"]
-enabled = true
-
-[plugins."google-calendar@openai-curated"]
-enabled = true
-
-[plugins."gmail@openai-curated"]
-enabled = true
-
-[plugins."github@openai-curated"]
-enabled = true
-
-[plugins."notion@openai-curated"]
-enabled = true
-
-[plugins."slack-legacy@openai-curated"]
-enabled = true
-
-[plugins."site-creator@openai-bundled-alpha"]
-enabled = true
-
-[plugins."documents@openai-primary-runtime"]
-enabled = true
-
-[plugins."spreadsheets@openai-primary-runtime"]
-enabled = true
-
-[plugins."presentations@openai-primary-runtime"]
-enabled = true
-
-[plugins."google-drive@openai-curated"]
-enabled = true
-
-[plugins."browser@openai-bundled-alpha"]
-enabled = true
-
-[plugins."sites@openai-bundled"]
-enabled = true
-
-[plugins."slack@openai-curated"]
-enabled = true
-
-[plugins."engineering-acceleration@openai-monorepo"]
-enabled = true
-
-[plugins."pdf@openai-primary-runtime"]
-enabled = true
-
-[plugins."template-creator@openai-primary-runtime"]
-enabled = true
-
-[plugins."visualize@openai-bundled"]
-enabled = true
-
-[plugins."browser@openai-bundled"]
-enabled = true
-
-[plugins."notebook@openai-bundled"]
-enabled = true
-
-[plugins."chrome-internal@openai-bundled"]
-enabled = true
-
-[plugins."computer-history@openai-bundled"]
-enabled = true
+[tui]
+terminal_title = ["activity", "current-dir", "run-state", "thread-title", "git-branch", "context-used"]
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "context-used", "thread-title", "run-state"]
+status_line_use_colors = true
+session_picker_view = "dense"
 
 [projects."/Users/tamird/code/openai/mia"]
 trust_level = "trusted"
@@ -206,12 +140,6 @@ trust_level = "trusted"
 [projects."/Users/tamird/code/pyjwt"]
 trust_level = "trusted"
 
-[projects."/Users/tamird/code/openai/infrasec-oncall-2025-02-10"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/code/openai/codex-brix-oidc-spike-archive"]
-trust_level = "trusted"
-
 [projects."/Users/tamird/code/openai/superassistant"]
 trust_level = "trusted"
 
@@ -266,9 +194,6 @@ trust_level = "trusted"
 [projects."/Users/tamird/code/kubernetes"]
 trust_level = "trusted"
 
-[projects."/Users/tamird/Downloads"]
-trust_level = "trusted"
-
 [projects."/Users/tamird/code/git"]
 trust_level = "trusted"
 
@@ -284,19 +209,7 @@ trust_level = "trusted"
 [projects."/Users/tamird/code/openai"]
 trust_level = "trusted"
 
-[projects."/Users/tamird/Documents/Codex/2026-05-16/please-collect-evidence-for-why-codex"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-05-16-is-this-thing-on"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-05-17-look-through-slack-for-information-about"]
-trust_level = "trusted"
-
 [projects."/Users/tamird/code/bb-storage"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-05-27/slack-plugin-slack-openai-curated-check"]
 trust_level = "trusted"
 
 [projects."/Users/tamird/code/uv"]
@@ -322,96 +235,3 @@ trust_level = "trusted"
 
 [projects."/Users/tamird/code/openapi-generator"]
 trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-16/i"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-16/instructions-for-timber-soul-the-personal"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-16/instructions-for-meadow-soul-the-personal"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-18/i-am"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-19/sc"]
-trust_level = "trusted"
-
-[projects."/Users/tamird/Documents/Codex/2026-07-22/chrome-internal-plugin-chrome-internal-openai"]
-trust_level = "trusted"
-
-[marketplaces.openai-primary-runtime]
-last_updated = "2026-07-24T08:14:19Z"
-source_type = "local"
-source = "/Users/tamird/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
-
-[marketplaces.openai-bundled]
-last_updated = "2026-07-24T20:12:14Z"
-source_type = "local"
-source = "/Users/tamird/.codex/.tmp/bundled-marketplaces/openai-bundled"
-
-[marketplaces.openai-internal-testing]
-last_updated = "2026-07-27T09:07:58Z"
-source_type = "local"
-source = "/Users/tamird/.codex/.tmp/marketplaces/openai-internal-testing"
-
-[memories]
-generate_memories = true
-use_memories = true
-
-[desktop]
-ambient-suggestions-enabled = true
-conversationDetailMode = "STEPS_COMMANDS"
-git-branch-prefix = "tamird/codex/"
-appearanceTheme = "dark"
-followUpQueueMode = "queue"
-dock-icon-preference = "app-default"
-keepRemoteControlAwakeWhilePluggedIn = true
-
-[tui]
-terminal_title = ["activity", "current-dir", "run-state", "thread-title", "git-branch", "context-used"]
-status_line = ["model-with-reasoning", "current-dir", "git-branch", "context-used", "thread-title", "run-state"]
-status_line_use_colors = true
-session_picker_view = "dense"
-resume_cwd = "current"
-
-[tui.model_availability_nux]
-"gpt-5.5" = 1
-mewthree = 4
-mewtwo = 1
-
-[apps.asdk_app_69a1d78e929881919bba0dbda1f6436d]
-enabled = true
-
-[mcp_servers.node_repl]
-args = []
-command = "/Applications/ChatGPT (Alpha).app/Contents/Resources/cua_node/bin/node_repl"
-startup_timeout_sec = 120
-
-[mcp_servers.node_repl.env]
-NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
-NODE_REPL_NODE_MODULE_DIRS = "/Applications/ChatGPT (Alpha).app/Contents/Resources/cua_node/lib/node_modules"
-NODE_REPL_NODE_PATH = "/Applications/ChatGPT (Alpha).app/Contents/Resources/cua_node/bin/node"
-NODE_REPL_TRUSTED_CODE_PATHS = "/Users/tamird/.codex"
-CODEX_HOME = "/Users/tamird/.codex"
-NODE_REPL_TRACE_META = "1"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "66d09786fb051bd338c5b80ac1bc5de96f7a450b4df630740210bf7fbd6a6673,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
-NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
-NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
-NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = "Control desktop apps on macOS through Computer Use."
-BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "internal-alpha"
-BROWSER_USE_CODEX_APP_VERSION = "26.721.40916"
-CODEX_CLI_PATH = "/Applications/ChatGPT (Alpha).app/Contents/Resources/codex"
-
-[mcp_servers.computer-use]
-command = "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient"
-args = ["mcp"]
-cwd = "."
-enabled = false
-
-[shell_environment_policy.set]
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "66d09786fb051bd338c5b80ac1bc5de96f7a450b4df630740210bf7fbd6a6673,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
-NODE_REPL_TRUSTED_CODE_PATHS = "/Users/tamird/.codex"
