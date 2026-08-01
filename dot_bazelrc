@@ -1,2 +1,5 @@
 startup --experimental_remote_repo_contents_cache
 build --experimental_output_paths=strip
+
+common --credential_helper=openai.buildbuddy.io=bazel-credential-op
+common --credential_helper_timeout=60s
