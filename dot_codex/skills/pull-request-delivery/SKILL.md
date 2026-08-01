@@ -85,6 +85,15 @@ Re-request a human review only after that review's substantive findings have
 actually been addressed. Follow genuine replies directly in their existing
 provider threads without creating new work.
 
+After addressing an actionable review thread, verify the fix on the published
+exact head and reply in that same thread with the concrete change and relevant
+validation. Stage replies to multiple threads and submit them together using
+GitHub's review feature; do not post a separate review for each response.
+After the review is published, resolve each fully addressed thread when the
+user has authorized resolution. Verify that every reply and resolved state
+persisted. Never silently resolve feedback, resolve a concern before it is
+fixed, or close a partially addressed thread.
+
 Explicitly acknowledge every substantive top-level human request after
 verifying its disposition against the current head. When the provider cannot
 thread a reply to the original comment or review, quote each reviewer and

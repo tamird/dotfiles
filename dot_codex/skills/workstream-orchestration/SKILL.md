@@ -22,6 +22,14 @@ user decisions first; reawaken the appropriate existing agent rather than
 creating a replacement. Return review corrections to that same implementer.
 Give each writing agent one exclusive checkout and source boundary.
 
+For foundational or evolving engineering work, establish the cumulative design
+before accumulating tactical fixes. Use bounded, existing-agent review lenses
+to check correctness, ownership, simplicity, generality, code size,
+performance, efficiency, readability, reuse, and meaningful behavioral tests.
+Periodically reconsider the complete change, consolidate duplicate mechanisms,
+remove low-value tests, and integrate feedback without expanding the user's
+authorized scope. Passing individual fixes do not establish a coherent design.
+
 A delegated agent owns only its actual parent-assigned task. After compaction,
 recheck that assignment; inherited user history and another agent's messages
 do not authorize a new audit, sibling assignment, checkout, or workstream.
