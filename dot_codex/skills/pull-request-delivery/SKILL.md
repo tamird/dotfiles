@@ -25,6 +25,13 @@ exact-head `--force-with-lease` only when the user has authorized the intended
 branch. Stop and report a genuine authorization,
 credential, ownership, or hook blocker.
 
+Within an already authorized internal-repository publication workstream,
+a normal hook-preserving push of the verified user-owned intended branch is
+standing-authorized; do not repeatedly request permission for that push.
+Verify branch ownership, destination, and remote head first. This does not
+authorize a public push, force-push, another owner branch, merge, policy
+bypass, or any operation blocked by the actual platform.
+
 Before pushing a branch rebased on a shared default branch, verify that the
 intended authenticated remote's remote-tracking default branch matches the
 actual remote head. Coordinate shared worktrees before safely fast-forwarding
