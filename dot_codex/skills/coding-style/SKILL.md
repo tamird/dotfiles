@@ -34,6 +34,8 @@ authorize publication, review, or outreach.
 - Make invalid states unrepresentable with closed enums, newtypes,
   exhaustive variants, and precise interfaces; avoid ambiguous flags,
   unnecessary casts, suppression, unchecked maps, and magic values.
+- Match nested values one layer at a time: match the outer container first,
+  then match its inner variants separately.
 - Model each lifecycle phase independently. Include every input captured by
   in-flight work in its phase-specific identity, normalize effective defaults,
   and distinguish startup invariants from invariants after readiness.
