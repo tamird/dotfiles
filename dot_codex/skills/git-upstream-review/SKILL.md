@@ -41,9 +41,10 @@ performance evidence, or revision mail.
 
 ## Git commit messages
 
-Use the local `area: subject` convention. Explain the mechanism and policy,
-not merely a heuristic or internal helper. Remove lab-notebook detail that does
-not help reviewers evaluate the claim.
+Use the local `area: subject` convention. Keep the complete subject at or
+below 50 characters and hard-wrap commit-message body prose at 72 columns.
+Explain the mechanism and policy, not merely a heuristic or internal helper.
+Remove lab-notebook detail that does not help reviewers evaluate the claim.
 
 Use only recognized trailers. Do not invent AI attribution trailers. When a
 historical discussion materially supports a decision, summarize it and cite it

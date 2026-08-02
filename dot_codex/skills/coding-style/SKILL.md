@@ -48,9 +48,11 @@ authorize publication, review, or outreach.
 - Keep required choices explicit, use lossless conversions, and test the
   exact error and unsupported failure rather than accepting any failure.
 - Validate recoverable inputs and assert actual internal invariants.
-- Define shared policy at its owner. Comment on non-obvious intent rather
-  than restating the implementation; cite independently checkable distant
-  facts and explain why genuinely deferred work could not be completed.
+- Define shared policy at its owner. While implementing, explain non-obvious
+  intent, invariants, failure modes, ownership boundaries, patch selections,
+  magic values, and pinned-input provenance. Cite independently checkable
+  sources; do not restate the code or defer needed explanations to review.
+  Explain why genuinely deferred work could not be completed.
 - For each test, identify a plausible broken implementation that makes it
   fail. Prefer a focused behavioral regression to mock plumbing, snapshots,
   import assertions, tautologies, negative-only assertions, or oversized

@@ -51,11 +51,13 @@ changes in the affected component for subject capitalization, wrapping,
 required test plans, citation conventions, and area prefixes. Do not import
 a prefix from another checkout, a generic example, or a single outlier; omit
 it when local history is mixed and no rule or user instruction requires it.
-Keep pull-request titles at or below 50 characters, including any prefix.
+Keep both commit subjects and pull-request titles at or below 50 characters,
+including any prefix.
 
 Prefer short paragraphs and real newlines. Write commit messages as plain
-text and pull-request descriptions so their raw text remains immediately
-readable without a Markdown renderer. Cite same-repository commits with
+text and hard-wrap their body prose at 72 columns. Do not hard-wrap
+pull-request descriptions; keep their raw text immediately readable without
+a Markdown renderer. Cite same-repository commits with
 unfenced SHAs of at least nine characters, extending them when uniqueness or
 linkification requires it. Link directly to authoritative external artifacts
 with numbered references in the prose and a compact list of URL definitions
