@@ -25,6 +25,7 @@ brew "bazelisk"
 brew "buildifier"
 
 brew "gh"
+brew "git" # for shell completion scripts
 brew "gnupg"
 brew "hyperfine"
 brew "mise"
@@ -39,7 +40,6 @@ brew "typos-cli"
 brew "uutils-coreutils"
 brew "watch"
 
-# brew "git"
 # https://github.com/dandavison/delta
 # brew "git-delta"
 # brew "curl"
