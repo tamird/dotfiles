@@ -61,6 +61,20 @@ authorize publication, review, or outreach.
   new behavioral coverage actually executes across its supported foreign,
   sandboxed, and cross-platform test matrix.
 
+## Keep clock domains separate
+
+- Use a monotonic clock for elapsed time, deadlines, polling, retries,
+  cancellation, and authentication or request budgets. Wall clocks can jump;
+  never enforce a duration with calendar time.
+- Use wall-clock time only for timestamps or external APIs that explicitly
+  require Unix time. Convert externally supplied epoch deadlines to an
+  absolute monotonic deadline once at the ownership boundary.
+- Propagate that monotonic deadline unchanged across components. Preserve one
+  immutable wall-to-monotonic anchor when refreshing or extending a deadline;
+  do not re-anchor it after a wall-clock adjustment.
+- Never compare or subtract values from different clock domains. Make the
+  domain clear in names, contracts, and meaningful clock-jump regressions.
+
 ## Diagnose failures and bound mitigations
 
 - Trace the original failure through its actual artifact, producer,
