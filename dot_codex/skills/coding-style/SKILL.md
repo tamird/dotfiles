@@ -29,6 +29,24 @@ authorize publication, review, or outreach.
 - Put substantive executable logic in an independently readable, typed,
   testable source. Keep cross-language and bootstrap glue minimal.
 
+## Begin every code review with first principles
+
+Apply this design pass automatically to every code, pull-request, or patch
+review before listing tactical defects. A patch-only review is incomplete.
+
+- Verify the actual failure, affected user, and desired behavior; do not
+  accept the proposed diagnosis or intervention point without evidence.
+- Trace the complete causal chain through the producer, consumer, resource
+  owner, lifecycle, supported execution modes, and existing cleanup.
+- Ask whether the change fixes the authoritative source or compensates for
+  it in a shared wrapper, downstream consumer, fallback, or test harness.
+- Compare the complete architecture with source-level correction, existing
+  primitives, deletion, and alternatives with an appropriate blast radius.
+- Account for every new test: require a distinct real failure, reject tests
+  that only validate the workaround, and prefer existing owner-level coverage.
+- Lead with an evidenced ownership or design flaw and the coherent alternative;
+  do not present its tactical symptoms as though the architecture were sound.
+
 ## Choose the right design, not the smallest patch
 
 - Optimize for a coherent design that solves the actual problem at the right

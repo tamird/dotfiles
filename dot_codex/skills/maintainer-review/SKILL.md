@@ -5,10 +5,10 @@ description: Derive affected maintainers' technical review personas from ownersh
 
 # Maintainer Review
 
-Apply `$coding-style` and `$change-record-writing` as the user's own baseline;
-they are not evidence of another maintainer's preferences. Use
-`$efficient-repo-tools` for bounded repository discovery and
-`$audience-aware-writing` for any authorized findings.
+Apply `$coding-style`'s mandatory first-principles review and
+`$change-record-writing` as the user's own baseline; they are not evidence of
+another maintainer's preferences. Use `$efficient-repo-tools` for bounded
+repository discovery and `$audience-aware-writing` for any authorized findings.
 
 ## Identify the actual review boundary
 
@@ -69,7 +69,7 @@ maintainer expectations conflict, explain the concrete tradeoff instead of
 inventing consensus.
 
 Report only independently verified findings. Explain the affected code,
-actual impact, supporting maintainer evidence, and smallest appropriate
-correction; separate a blocking requirement from a question or stylistic
-preference. Reviewing does not authorize editing code, publishing comments,
-contacting maintainers, or merging.
+actual impact, supporting maintainer evidence, and appropriate correction;
+distinguish blocking requirements from questions and stylistic preferences.
+Reviewing does not authorize editing code, publishing comments, contacting
+maintainers, or merging.
