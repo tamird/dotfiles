@@ -1,6 +1,6 @@
 ---
 name: coding-style
-description: Design, implement, and review concise, correct, precisely typed changes grounded in real ownership, meaningful behavioral tests, incident evidence, bounded mitigations, canonical generation, and measured impact.
+description: Design, implement, and review coherent, correct, precisely typed changes grounded in real ownership, meaningful behavioral tests, incident evidence, bounded mitigations, canonical generation, and measured impact.
 ---
 
 # Coding Style
@@ -28,6 +28,32 @@ authorize publication, review, or outreach.
   mistake change volume, approvals, or green CI for design evidence.
 - Put substantive executable logic in an independently readable, typed,
   testable source. Keep cross-language and bootstrap glue minimal.
+
+## Choose the right design, not the smallest patch
+
+- Optimize for a coherent design that solves the actual problem at the right
+  ownership boundary. The smallest edit, shortest diff, and fewest lines are
+  not the objective; a broader redesign is appropriate when the existing
+  model, interface, or division of responsibility is wrong.
+- Treat repeated tactical fixes, recurring review findings, multiplying
+  special cases, and accumulating flags or fallbacks as evidence of a flawed
+  design. Stop plugging holes, reconsider the end-to-end requirements and
+  invariants, and replace the structure causing the family of failures.
+- Define the actual user requirement before adding branches, interfaces,
+  policy, metrics, compatibility paths, or speculative edge-case machinery.
+  Remove superseded tactical scaffolding when the coherent design makes it
+  unnecessary; do not preserve it as an accidental requirement.
+- Inspect the cumulative merge-base diff after each substantive change. Count
+  production and test lines separately and use growth, duplication, and churn
+  as design diagnostics, not as a substitute for judging correctness or
+  architectural coherence.
+- Add only distinct, meaningful behavioral regressions. Reuse existing
+  fixtures, collapse repetitive setup and overlapping scenarios, and reject
+  mock-heavy or subprocess-heavy tests disproportionate to the behavior.
+- Catch only the specific expected exception at the operation that produces
+  it. Never swallow broad `Exception` or `OSError` merely for convenience;
+  for an optional missing file, catch `FileNotFoundError` and let unexpected
+  permission, filesystem, and other failures propagate.
 
 ## Make the contract explicit
 
