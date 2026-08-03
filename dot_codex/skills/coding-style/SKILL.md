@@ -55,6 +55,31 @@ authorize publication, review, or outreach.
   for an optional missing file, catch `FileNotFoundError` and let unexpected
   permission, filesystem, and other failures propagate.
 
+## Enforce a strict behavioral-test budget
+
+- Start from zero new tests. Before changing tests, identify the observed bug or
+  supported contract, inspect existing owner-level coverage, and choose the
+  smallest meaningful behavioral change.
+- Add or retain a test only when it protects a distinct real failure or required
+  contract, a plausible broken implementation would fail it, and existing
+  coverage cannot already expose that failure. Explain this justification
+  before writing the test. If any condition is missing, do not add it.
+- Prefer extending one existing end-to-end or owner-level behavioral test over
+  adding another test, fixture, helper, mock, snapshot, subprocess, or setup
+  tree. Combine related failure variants in one concise table-driven test.
+- Do not duplicate one invariant across unit and integration tests, transports,
+  implementations, or fixtures unless their ownership or failure mechanisms
+  genuinely differ. Remove tests invalidated or made redundant by a redesign.
+- Never add tests for static definitions, removed behavior, speculative edge
+  cases, tautologies, implementation details, negative-only trivia, or a test
+  harness itself. Do not invent expensive fixtures merely to claim coverage.
+- Audit cumulative merge-base production and test line counts before, during,
+  and after implementation. If test setup dominates the change or scenarios
+  overlap, stop, reassess, consolidate, and delete before adding anything.
+- Before publication, account for every new or materially changed test: name
+  its distinct demonstrated failure and why cheaper existing coverage cannot
+  catch it. Delete any test that does not earn its maintenance cost.
+
 ## Make the contract explicit
 
 - Make invalid states unrepresentable with closed enums, newtypes,
