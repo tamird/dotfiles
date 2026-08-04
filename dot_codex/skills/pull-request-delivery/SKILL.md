@@ -25,6 +25,16 @@ exact-head `--force-with-lease` only when the user has authorized the intended
 branch. Stop and report a genuine authorization,
 credential, ownership, or hook blocker.
 
+When the user explicitly authorizes Git-publication fallbacks, try normal
+signing and SSH first. If signing actually fails and repository policy permits
+an unsigned commit, retry only that intended commit with
+`git -c commit.gpgsign=false commit ...`. If an SSH push actually fails because
+SSH authentication or transport is unavailable, retry only that push against
+the already verified HTTPS destination. Preserve the user's Git identity,
+normal hooks, configured remotes, and branch protections. Never persistently
+change Git or signing configuration, credentials, hooks, or remote URLs;
+never use these fallbacks to bypass repository policy.
+
 Within an already authorized internal-repository publication workstream,
 a normal hook-preserving push of the verified user-owned intended branch is
 standing-authorized; do not repeatedly request permission for that push.
