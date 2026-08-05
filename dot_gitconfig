@@ -30,6 +30,8 @@
 	cookiefile = ~/.gitcookies
 [hub]
 	protocol = ssh
+[index]
+	threads = true
 [init]
 	defaultBranch = main
 [log]

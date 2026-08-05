@@ -1,4 +1,5 @@
-Include applied-devbox.d/*.conf # Must be ABOVE any Host directives
+# Must be ABOVE any Host directives
+Include applied-devbox.d/*.conf
 
 Host gitolite.kernel.org
   User git
